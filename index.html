@@ -1,0 +1,180 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bible Infinite Scroll</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@6.26.0/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <audio id="bgm" loop></audio>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const App = () => {
+      const [verses, setVerses] = useState([]);
+      const [input, setInput] = useState('');
+      const [searchResults, setSearchResults] = useState([]);
+      const scrollRef = useRef(null);
+      const [scrollPos, setScrollPos] = useState(0);
+
+      // Load saved verses from localStorage
+      useEffect(() => {
+        const saved = localStorage.getItem('verses');
+        if (saved) setVerses(JSON.parse(saved));
+      }, []);
+
+      // Save verses to localStorage
+      useEffect(() => {
+        localStorage.setItem('verses', JSON.stringify(verses));
+      }, [verses]);
+
+      // Auto-scrolling logic
+      useEffect(() => {
+        const scroll = () => {
+          setScrollPos((prev) => {
+            const maxHeight = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
+            if (prev >= maxHeight) return 0; // Reset to top
+            return prev + 0.5; // Adjust speed (0.5px per frame)
+          });
+        };
+        const interval = setInterval(scroll, 16); // ~60fps
+        return () => clearInterval(interval);
+      }, []);
+
+      // Update scroll position
+      useEffect(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollPos;
+        }
+      }, [scrollPos]);
+
+      // Search verses
+      const searchVerses = async () => {
+        try {
+          // Example: Parse input like "창세기 1:1~5" or "Genesis 1:1-5"
+          const queries = input.split(',').map(q => q.trim());
+          const results = [];
+          for (const query of queries) {
+            // Mock API call (replace with getBible.net API)
+            const response = await fetch(`https://getbible.net/v2/kjv/${query}.json`);
+            const data = await response.json();
+            results.push({ query, text: data.text }); // Simplified
+          }
+          setSearchResults(results);
+        } catch (error) {
+          console.error('Error fetching verses:', error);
+        }
+      };
+
+      // Add selected verses
+      const addVerses = (verse) => {
+        setVerses([...verses, verse]);
+        setSearchResults([]);
+        setInput('');
+        // Speak verse
+        const utterance = new SpeechSynthesisUtterance(verse.text);
+        utterance.lang = 'en-US'; // Switch to 'ko-KR' for Korean
+        window.speechSynthesis.speak(utterance);
+      };
+
+      return (
+        <div className="bg-black text-white min-h-screen p-4">
+          <div className="max-w-2xl mx-auto">
+            <h1 className="text-2xl font-bold mb-4">Bible Infinite Scroll</h1>
+            <div className="mb-4">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="예: 창세기 1:1~5, 시편 23"
+                className="bg-gray-800 text-white p-2 rounded w-full"
+              />
+              <button
+                onClick={searchVerses}
+                className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded mt-2"
+              >
+                검색
+              </button>
+            </div>
+            {searchResults.length > 0 && (
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold">검색 결과</h2>
+                {searchResults.map((result, idx) => (
+                  <div key={idx} className="border-b border-gray-700 py-2">
+                    <input
+                      type="checkbox"
+                      onChange={() => addVerses(result)}
+                    />
+                    <span className="ml-2">{result.query}: {result.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div
+              ref={scrollRef}
+              className="h-[70vh] overflow-hidden"
+            >
+              {verses.length > 0 ? (
+                verses.concat(verses).map((verse, idx) => ( // Duplicate for seamless loop
+                  <div key={idx} className="py-4">
+                    <p className="text-lg">{verse.text} (KJV)</p>
+                    <p className="text-lg">한글 구절 (개역개정, 준비 중)</p>
+                  </div>
+                ))
+              ) : (
+                <p>구절을 추가하세요.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
