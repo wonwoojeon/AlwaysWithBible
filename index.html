@@ -1,4 +1,43 @@
-<!DOCTYPE html>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -63,6 +102,16 @@
       height: 70vh;
       overflow: hidden;
     }
+    .slider-container {
+      margin: 16px 0;
+    }
+    .slider-label {
+      display: block;
+      margin-bottom: 8px;
+    }
+    .slider {
+      width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -72,7 +121,7 @@
     // CDN 로드 확인
     if (!window.React || !window.ReactDOM || !window.Babel) {
       console.error('Failed to load required scripts (React, ReactDOM, or Babel). Please check your network or CDN availability.');
-      document.getElementById('root').innerHTML = '<p class="error">스크립트 로드 실패: 네트워크를 확인하거나 나중에 다시 시도하세요.</p>';
+      document.getElementById('root').innerHTML = '<p class="error">스크립트 로드 실패: 네트워크를 확인하거나 나중에 다시 시도하세요. 대안으로 CDN 대신 로컬 파일을 사용할 수 있습니다.</p>';
     } else {
       const { useState, useEffect, useRef } = React;
 
@@ -82,32 +131,47 @@
         const [searchResults, setSearchResults] = useState([]);
         const [error, setError] = useState('');
         const [loading, setLoading] = useState(false);
+        const [scrollSpeed, setScrollSpeed] = useState(0.5); // 스크롤 속도 (픽셀/프레임)
+        const [speechRate, setSpeechRate] = useState(1); // 음성 재생 속도
         const scrollRef = useRef(null);
         const [scrollPos, setScrollPos] = useState(0);
 
         // Load saved verses from localStorage
         useEffect(() => {
           const saved = localStorage.getItem('verses');
-          if (saved) setVerses(JSON.parse(saved));
+          if (saved) {
+            try {
+              setVerses(JSON.parse(saved));
+            } catch (e) {
+              console.error('Failed to parse verses from localStorage:', e);
+              setError('저장된 구절을 불러오지 못했습니다.');
+            }
+          }
         }, []);
 
         // Save verses to localStorage
         useEffect(() => {
-          localStorage.setItem('verses', JSON.stringify(verses));
+          try {
+            localStorage.setItem('verses', JSON.stringify(verses));
+          } catch (e) {
+            console.error('Failed to save verses to localStorage:', e);
+            setError('구절을 저장하지 못했습니다.');
+          }
         }, [verses]);
 
         // Auto-scrolling logic
         useEffect(() => {
           const scroll = () => {
             setScrollPos((prev) => {
+              if (!scrollRef.current) return prev;
               const maxHeight = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
               if (prev >= maxHeight) return 0;
-              return prev + 0.5;
+              return prev + scrollSpeed;
             });
           };
           const interval = setInterval(scroll, 16);
           return () => clearInterval(interval);
-        }, []);
+        }, [scrollSpeed]);
 
         // Update scroll position
         useEffect(() => {
@@ -116,7 +180,13 @@
           }
         }, [scrollPos]);
 
-        // Search verses using Query API
+        // 스크롤 속도에 따라 음성 재생 속도 자동 조절
+        useEffect(() => {
+          const newSpeechRate = 0.5 + (scrollSpeed - 0.1) * (1.5 / 1.9);
+          setSpeechRate(Math.min(Math.max(newSpeechRate, 0.5), 2));
+        }, [scrollSpeed]);
+
+        // Search verses using GetBible (KJV) and aromkimm/bible (Korean)
         const searchVerses = async () => {
           setLoading(true);
           setError('');
@@ -198,32 +268,43 @@
               const verseMatch = query.match(/(\d+:\d+(~\d+)?)/)?.[0]?.replace('~', '-');
               if (!book || !verseMatch) throw new Error('잘못된 구절 형식입니다. 예: 창세기 1:1~5');
               const formattedQuery = `${book} ${verseMatch}`;
+              const chapter = verseMatch.split('-')[0].split(':')[0];
+              const verseRange = verseMatch.split('-');
+              const startVerse = parseInt(verseRange[0].split(':')[1]);
+              const endVerse = verseRange[1] ? parseInt(verseRange[1]) : startVerse;
 
-              // 영어(KJV) 구절 가져오기
-              const kjvResponse = await fetch(
-                `https://query.getbible.net/v2/kjv/${formattedQuery}`
-              );
-              if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status);
-              const kjvData = await kjvResponse.json();
-              if (kjvData.error) throw new Error(kjvData.error);
-              const kjvKey = Object.keys(kjvData)[0];
-              const kjvText = kjvData[kjvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+              // 영어(KJV) 구절 가져오기 - GetBible API (프록시 사용)
+              let kjvText = '영어 구절을 불러오지 못했습니다.';
+              try {
+                const kjvResponse = await fetch(
+                  `/api/getbible/v2/kjv/${formattedQuery}`
+                );
+                if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status);
+                const kjvData = await kjvResponse.json();
+                if (kjvData.error) throw new Error(kjvData.error);
+                const kjvKey = Object.keys(kjvData)[0];
+                kjvText = kjvData[kjvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+              } catch (kjvError) {
+                console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError);
+              }
 
-              // 한글(개역개정, krv) 구절 가져오기
+              // 한글(개역개정) 구절 가져오기 - aromkimm/bible (프록시 사용)
               let krvText = '한글 구절을 불러오지 못했습니다.';
               try {
-                const krvResponse = await fetch(
-                  `https://query.getbible.net/v2/krv/${formattedQuery}`
+                const koreanResponse = await fetch(
+                  `/api/koreanbible/${book}.json`
                 );
-                if (krvResponse.ok) {
-                  const krvData = await krvResponse.json();
-                  if (!krvData.error) {
-                    const krvKey = Object.keys(krvData)[0];
-                    krvText = krvData[krvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
-                  }
+                if (!koreanResponse.ok) throw new Error('Korean Bible 요청 실패: ' + koreanResponse.status);
+                const koreanData = await koreanResponse.json();
+                const chapterData = koreanData.find(ch => ch.chapter === parseInt(chapter));
+                if (chapterData) {
+                  const verses = chapterData.verses.filter(v => v.verse >= startVerse && v.verse <= endVerse);
+                  krvText = verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+                } else {
+                  throw new Error('해당 장을 찾을 수 없습니다.');
                 }
               } catch (krvError) {
-                console.warn('KRV 데이터를 가져오지 못했습니다:', krvError);
+                console.warn('한글 구절 데이터를 가져오지 못했습니다:', krvError);
               }
 
               results.push({ query, kjvText, krvText });
@@ -244,7 +325,14 @@
           setInput('');
           const utterance = new SpeechSynthesisUtterance(verse.kjvText);
           utterance.lang = 'en-US';
+          utterance.rate = speechRate;
           window.speechSynthesis.speak(utterance);
+
+          // 한글 음성 재생
+          const krUtterance = new SpeechSynthesisUtterance(verse.krvText);
+          krUtterance.lang = 'ko-KR';
+          krUtterance.rate = speechRate;
+          window.speechSynthesis.speak(krUtterance);
         };
 
         return (
@@ -264,6 +352,19 @@
               >
                 검색
               </button>
+            </div>
+            <div className="slider-container">
+              <label className="slider-label">스크롤 속도: {scrollSpeed.toFixed(1)}</label>
+              <input
+                type="range"
+                min="0.1"
+                max="2"
+                step="0.1"
+                value={scrollSpeed}
+                onChange={(e) => setScrollSpeed(parseFloat(e.target.value))}
+                className="slider"
+              />
+              <p>음성 재생 속도: {speechRate.toFixed(1)}</p>
             </div>
             {loading && <p className="loading">검색 중...</p>}
             {error && <div className="error">{error}</div>}
