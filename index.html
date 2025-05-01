@@ -1,92 +1,23 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bible Infinite Scroll</title>
-  <!-- React and ReactDOM CDNs -->
-  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-  <!-- Babel CDN -->
-  <script crossorigin src="https://unpkg.com/@babel/standalone@7.24.5/babel.min.js"></script>
-  <!-- Tailwind CSS: Using pre-built CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@6.26.0/babel.min.js"></script>
   <style>
-    .bg-black { background-color: #000; }
-    .text-white { color: #fff; }
-    .min-h-screen { min-height: 100vh; }
-    .p-4 { padding: 1rem; }
-    .max-w-2xl { max-width: 42rem; }
-    .mx-auto { margin-left: auto; margin-right: auto; }
-    .text-2xl { font-size: 1.5rem; }
-    .font-bold { font-weight: 700; }
-    .mb-4 { margin-bottom: 1rem; }
-    .bg-gray-800 { background-color: #2d3748; }
-    .p-2 { padding: 0.5rem; }
-    .rounded { border-radius: 0.25rem; }
-    .w-full { width: 100%; }
-    .bg-blue-600 { background-color: #2563eb; }
-    .hover\:bg-blue-700:hover { background-color: #1d4ed8; }
-    .text-lg { font-size: 1.125rem; }
-    .font-semibold { font-weight: 600; }
-    .border-b { border-bottom-width: 1px; }
-    .border-gray-700 { border-color: #4b5563; }
-    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-    .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
-    .ml-2 { margin-left: 0.5rem; }
-    .text-red-500 { color: #ef4444; }
-    .text-gray-400 { color: #9ca3af; }
-    .h-\[70vh\] { height: 70vh; }
-    .overflow-hidden { overflow: hidden; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
   </style>
 </head>
 <body>
   <div id="root"></div>
   <audio id="bgm" loop></audio>
   <script type="text/babel">
-    // Ensure Babel is loaded before running JSX
-    if (typeof Babel === 'undefined') {
-      console.error('Babel is not loaded. Please check the Babel CDN.');
-    }
-
     const { useState, useEffect, useRef } = React;
 
     const App = () => {
@@ -129,7 +60,7 @@
         }
       }, [scrollPos]);
 
-      // Search verses using GetBible Query API (without API key)
+      // Search verses using Query API
       const searchVerses = async () => {
         setLoading(true);
         setError('');
@@ -211,16 +142,28 @@
             const verseMatch = query.match(/(\d+:\d+(~\d+)?)/)?.[0]?.replace('~', '-');
             if (!book || !verseMatch) throw new Error('잘못된 구절 형식입니다. 예: 창세기 1:1~5');
             const formattedQuery = `${book} ${verseMatch}`;
-            
-            const response = await fetch(
+
+            // 영어(KJV) 구절 가져오기
+            const kjvResponse = await fetch(
               `https://query.getbible.net/v2/kjv/${formattedQuery}`
             );
-            if (!response.ok) throw new Error('API 요청 실패: ' + response.status);
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-            const verseKey = Object.keys(data)[0];
-            const verseText = data[verseKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
-            results.push({ query, text: verseText });
+            if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status);
+            const kjvData = await response.json();
+            if (kjvData.error) throw new Error(kjvData.error);
+            const kjvKey = Object.keys(kjvData)[0];
+            const kjvText = kjvData[kjvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+
+            // 한글(개역개정, krv) 구절 가져오기
+            const krvResponse = await fetch(
+              `https://query.getbible.net/v2/krv/${formattedQuery}`
+            );
+            if (!krvResponse.ok) throw new Error('KRV API 요청 실패: ' + krvResponse.status);
+            const krvData = await response.json();
+            if (krvData.error) throw new Error(krvData.error);
+            const krvKey = Object.keys(krvData)[0];
+            const krvText = krvData[krvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+
+            results.push({ query, kjvText, krvText });
           }
           setSearchResults(results);
         } catch (error) {
@@ -236,7 +179,7 @@
         setVerses([...verses, verse]);
         setSearchResults([]);
         setInput('');
-        const utterance = new SpeechSynthesisUtterance(verse.text);
+        const utterance = new SpeechSynthesisUtterance(verse.kjvText);
         utterance.lang = 'en-US';
         window.speechSynthesis.speak(utterance);
       };
@@ -271,7 +214,8 @@
                       type="checkbox"
                       onChange={() => addVerses(result)}
                     />
-                    <span className="ml-2">{result.query}: {result.text}</span>
+                    <span className="ml-2">{result.query}: {result.kjvText} (KJV)</span>
+                    <p className="ml-6">{result.krvText} (개역개정)</p>
                   </div>
                 ))}
               </div>
@@ -283,8 +227,8 @@
               {verses.length > 0 ? (
                 verses.concat(verses).map((verse, idx) => (
                   <div key={idx} className="py-4">
-                    <p className="text-lg">{verse.text} (KJV)</p>
-                    <p className="text-lg">한글 구절 (개역개정, 준비 중)</p>
+                    <p className="text-lg">{verse.kjvText} (KJV)</p>
+                    <p className="text-lg">{verse.krvText} (개역개정)</p>
                   </div>
                 ))
               ) : (
@@ -296,12 +240,7 @@
       );
     };
 
-    // Ensure React and ReactDOM are loaded before rendering
-    if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
-      console.error('React or ReactDOM is not loaded. Please check the CDN links.');
-    } else {
-      ReactDOM.render(<App />, document.getElementById('root'));
-    }
+    ReactDOM.render(<App />, document.getElementById('root'));
   </script>
 </body>
 </html>
