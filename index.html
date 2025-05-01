@@ -11,6 +11,57 @@
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: #000;
+      color: #fff;
+    }
+    .container {
+      max-width: 672px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .title {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+    .input {
+      background-color: #1f2937;
+      color: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .button {
+      background-color: #2563eb;
+      color: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+    .button:hover {
+      background-color: #1d4ed8;
+    }
+    .error {
+      color: #ef4444;
+      margin-bottom: 16px;
+    }
+    .loading {
+      color: #9ca3af;
+      margin-bottom: 16px;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+    .verse {
+      padding: 16px 0;
+      border-bottom: 1px solid #374151;
+    }
+    .scroll-area {
+      height: 70vh;
+      overflow: hidden;
     }
   </style>
 </head>
@@ -18,198 +69,209 @@
   <div id="root"></div>
   <audio id="bgm" loop></audio>
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+    // CDN 로드 확인
+    if (!window.React || !window.ReactDOM || !window.Babel) {
+      console.error('Failed to load required scripts (React, ReactDOM, or Babel). Please check your network or CDN availability.');
+      document.getElementById('root').innerHTML = '<p class="error">스크립트 로드 실패: 네트워크를 확인하거나 나중에 다시 시도하세요.</p>';
+    } else {
+      const { useState, useEffect, useRef } = React;
 
-    const App = () => {
-      const [verses, setVerses] = useState([]);
-      const [input, setInput] = useState('');
-      const [searchResults, setSearchResults] = useState([]);
-      const [error, setError] = useState('');
-      const [loading, setLoading] = useState(false);
-      const scrollRef = useRef(null);
-      const [scrollPos, setScrollPos] = useState(0);
+      const App = () => {
+        const [verses, setVerses] = useState([]);
+        const [input, setInput] = useState('');
+        const [searchResults, setSearchResults] = useState([]);
+        const [error, setError] = useState('');
+        const [loading, setLoading] = useState(false);
+        const scrollRef = useRef(null);
+        const [scrollPos, setScrollPos] = useState(0);
 
-      // Load saved verses from localStorage
-      useEffect(() => {
-        const saved = localStorage.getItem('verses');
-        if (saved) setVerses(JSON.parse(saved));
-      }, []);
+        // Load saved verses from localStorage
+        useEffect(() => {
+          const saved = localStorage.getItem('verses');
+          if (saved) setVerses(JSON.parse(saved));
+        }, []);
 
-      // Save verses to localStorage
-      useEffect(() => {
-        localStorage.setItem('verses', JSON.stringify(verses));
-      }, [verses]);
+        // Save verses to localStorage
+        useEffect(() => {
+          localStorage.setItem('verses', JSON.stringify(verses));
+        }, [verses]);
 
-      // Auto-scrolling logic
-      useEffect(() => {
-        const scroll = () => {
-          setScrollPos((prev) => {
-            const maxHeight = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
-            if (prev >= maxHeight) return 0;
-            return prev + 0.5;
-          });
-        };
-        const interval = setInterval(scroll, 16);
-        return () => clearInterval(interval);
-      }, []);
-
-      // Update scroll position
-      useEffect(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollPos;
-        }
-      }, [scrollPos]);
-
-      // Search verses using Query API
-      const searchVerses = async () => {
-        setLoading(true);
-        setError('');
-        try {
-          const queries = input.split(',').map(q => q.trim());
-          const results = [];
-          const bookMap = {
-            '창세기': 'Genesis',
-            '출애굽기': 'Exodus',
-            '레위기': 'Leviticus',
-            '민수기': 'Numbers',
-            '신명기': 'Deuteronomy',
-            '여호수아': 'Joshua',
-            '사사기': 'Judges',
-            '룻기': 'Ruth',
-            '사무엘상': '1 Samuel',
-            '사무엘하': '2 Samuel',
-            '열왕기상': '1 Kings',
-            '열왕기하': '2 Kings',
-            '역대상': '1 Chronicles',
-            '역대하': '2 Chronicles',
-            '에스라': 'Ezra',
-            '느헤미야': 'Nehemiah',
-            '에스더': 'Esther',
-            '욥기': 'Job',
-            '시편': 'Psalms',
-            '잠언': 'Proverbs',
-            '전도서': 'Ecclesiastes',
-            '아가': 'Song of Solomon',
-            '이사야': 'Isaiah',
-            '예레미야': 'Jeremiah',
-            '예레미야애가': 'Lamentations',
-            '에스겔': 'Ezekiel',
-            '다니엘': 'Daniel',
-            '호세아': 'Hosea',
-            '요엘': 'Joel',
-            '아모스': 'Amos',
-            '오바댜': 'Obadiah',
-            '요나': 'Jonah',
-            '미가': 'Micah',
-            '나훔': 'Nahum',
-            '하박국': 'Habakkuk',
-            '스바냐': 'Zephaniah',
-            '학개': 'Haggai',
-            '스가랴': 'Zechariah',
-            '말라기': 'Malachi',
-            '마태복음': 'Matthew',
-            '마가복음': 'Mark',
-            '누가복음': 'Luke',
-            '요한복음': 'John',
-            '사도행전': 'Acts',
-            '로마서': 'Romans',
-            '고린도전서': '1 Corinthians',
-            '고린도후서': '2 Corinthians',
-            '갈라디아서': 'Galatians',
-            '에베소서': 'Ephesians',
-            '빌립보서': 'Philippians',
-            '골로새서': 'Colossians',
-            '데살로니가전서': '1 Thessalonians',
-            '데살로니가후서': '2 Thessalonians',
-            '디모데전서': '1 Timothy',
-            '디모데후서': '2 Timothy',
-            '디도서': 'Titus',
-            '빌레몬서': 'Philemon',
-            '히브리서': 'Hebrews',
-            '야고보서': 'James',
-            '베드로전서': '1 Peter',
-            '베드로후서': '2 Peter',
-            '요한1서': '1 John',
-            '요한2서': '2 John',
-            '요한3서': '3 John',
-            '유다서': 'Jude',
-            '요한계시록': 'Revelation'
+        // Auto-scrolling logic
+        useEffect(() => {
+          const scroll = () => {
+            setScrollPos((prev) => {
+              const maxHeight = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
+              if (prev >= maxHeight) return 0;
+              return prev + 0.5;
+            });
           };
+          const interval = setInterval(scroll, 16);
+          return () => clearInterval(interval);
+        }, []);
 
-          for (const query of queries) {
-            const bookMatch = query.match(/^(\D+)/)?.[1]?.trim();
-            const book = bookMap[bookMatch] || bookMatch;
-            const verseMatch = query.match(/(\d+:\d+(~\d+)?)/)?.[0]?.replace('~', '-');
-            if (!book || !verseMatch) throw new Error('잘못된 구절 형식입니다. 예: 창세기 1:1~5');
-            const formattedQuery = `${book} ${verseMatch}`;
-
-            // 영어(KJV) 구절 가져오기
-            const kjvResponse = await fetch(
-              `https://query.getbible.net/v2/kjv/${formattedQuery}`
-            );
-            if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status);
-            const kjvData = await response.json();
-            if (kjvData.error) throw new Error(kjvData.error);
-            const kjvKey = Object.keys(kjvData)[0];
-            const kjvText = kjvData[kjvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
-
-            // 한글(개역개정, krv) 구절 가져오기
-            const krvResponse = await fetch(
-              `https://query.getbible.net/v2/krv/${formattedQuery}`
-            );
-            if (!krvResponse.ok) throw new Error('KRV API 요청 실패: ' + krvResponse.status);
-            const krvData = await response.json();
-            if (krvData.error) throw new Error(krvData.error);
-            const krvKey = Object.keys(krvData)[0];
-            const krvText = krvData[krvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
-
-            results.push({ query, kjvText, krvText });
+        // Update scroll position
+        useEffect(() => {
+          if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollPos;
           }
-          setSearchResults(results);
-        } catch (error) {
-          console.error('Error fetching verses:', error);
-          setError('구절을 불러오지 못했습니다: ' + error.message);
-        } finally {
-          setLoading(false);
-        }
-      };
+        }, [scrollPos]);
 
-      // Add selected verses
-      const addVerses = (verse) => {
-        setVerses([...verses, verse]);
-        setSearchResults([]);
-        setInput('');
-        const utterance = new SpeechSynthesisUtterance(verse.kjvText);
-        utterance.lang = 'en-US';
-        window.speechSynthesis.speak(utterance);
-      };
+        // Search verses using Query API
+        const searchVerses = async () => {
+          setLoading(true);
+          setError('');
+          try {
+            const queries = input.split(',').map(q => q.trim());
+            const results = [];
+            const bookMap = {
+              '창세기': 'Genesis',
+              '출애굽기': 'Exodus',
+              '레위기': 'Leviticus',
+              '민수기': 'Numbers',
+              '신명기': 'Deuteronomy',
+              '여호수아': 'Joshua',
+              '사사기': 'Judges',
+              '룻기': 'Ruth',
+              '사무엘상': '1 Samuel',
+              '사무엘하': '2 Samuel',
+              '열왕기상': '1 Kings',
+              '열왕기하': '2 Kings',
+              '역대상': '1 Chronicles',
+              '역대하': '2 Chronicles',
+              '에스라': 'Ezra',
+              '느헤미야': 'Nehemiah',
+              '에스더': 'Esther',
+              '욥기': 'Job',
+              '시편': 'Psalms',
+              '잠언': 'Proverbs',
+              '전도서': 'Ecclesiastes',
+              '아가': 'Song of Solomon',
+              '이사야': 'Isaiah',
+              '예레미야': 'Jeremiah',
+              '예레미야애가': 'Lamentations',
+              '에스겔': 'Ezekiel',
+              '다니엘': 'Daniel',
+              '호세아': 'Hosea',
+              '요엘': 'Joel',
+              '아모스': 'Amos',
+              '오바댜': 'Obadiah',
+              '요나': 'Jonah',
+              '미가': 'Micah',
+              '나훔': 'Nahum',
+              '하박국': 'Habakkuk',
+              '스바냐': 'Zephaniah',
+              '학개': 'Haggai',
+              '스가랴': 'Zechariah',
+              '말라기': 'Malachi',
+              '마태복음': 'Matthew',
+              '마가복음': 'Mark',
+              '누가복음': 'Luke',
+              '요한복음': 'John',
+              '사도행전': 'Acts',
+              '로마서': 'Romans',
+              '고린도전서': '1 Corinthians',
+              '고린도후서': '2 Corinthians',
+              '갈라디아서': 'Galatians',
+              '에베소서': 'Ephesians',
+              '빌립보서': 'Philippians',
+              '골로새서': 'Colossians',
+              '데살로니가전서': '1 Thessalonians',
+              '데살로니가후서': '2 Thessalonians',
+              '디모데전서': '1 Timothy',
+              '디모데후서': '2 Timothy',
+              '디도서': 'Titus',
+              '빌레몬서': 'Philemon',
+              '히브리서': 'Hebrews',
+              '야고보서': 'James',
+              '베드로전서': '1 Peter',
+              '베드로후서': '2 Peter',
+              '요한1서': '1 John',
+              '요한2서': '2 John',
+              '요한3서': '3 John',
+              '유다서': 'Jude',
+              '요한계시록': 'Revelation'
+            };
 
-      return (
-        <div className="bg-black text-white min-h-screen p-4">
-          <div className="max-w-2xl mx-auto">
-            <h1 className="text-2xl font-bold mb-4">Bible Infinite Scroll</h1>
+            for (const query of queries) {
+              const bookMatch = query.match(/^(\D+)/)?.[1]?.trim();
+              const book = bookMap[bookMatch] || bookMatch;
+              const verseMatch = query.match(/(\d+:\d+(~\d+)?)/)?.[0]?.replace('~', '-');
+              if (!book || !verseMatch) throw new Error('잘못된 구절 형식입니다. 예: 창세기 1:1~5');
+              const formattedQuery = `${book} ${verseMatch}`;
+
+              // 영어(KJV) 구절 가져오기
+              const kjvResponse = await fetch(
+                `https://query.getbible.net/v2/kjv/${formattedQuery}`
+              );
+              if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status);
+              const kjvData = await kjvResponse.json();
+              if (kjvData.error) throw new Error(kjvData.error);
+              const kjvKey = Object.keys(kjvData)[0];
+              const kjvText = kjvData[kjvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+
+              // 한글(개역개정, krv) 구절 가져오기
+              let krvText = '한글 구절을 불러오지 못했습니다.';
+              try {
+                const krvResponse = await fetch(
+                  `https://query.getbible.net/v2/krv/${formattedQuery}`
+                );
+                if (krvResponse.ok) {
+                  const krvData = await krvResponse.json();
+                  if (!krvData.error) {
+                    const krvKey = Object.keys(krvData)[0];
+                    krvText = krvData[krvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+                  }
+                }
+              } catch (krvError) {
+                console.warn('KRV 데이터를 가져오지 못했습니다:', krvError);
+              }
+
+              results.push({ query, kjvText, krvText });
+            }
+            setSearchResults(results);
+          } catch (error) {
+            console.error('Error fetching verses:', error);
+            setError('구절을 불러오지 못했습니다: ' + error.message);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        // Add selected verses
+        const addVerses = (verse) => {
+          setVerses([...verses, verse]);
+          setSearchResults([]);
+          setInput('');
+          const utterance = new SpeechSynthesisUtterance(verse.kjvText);
+          utterance.lang = 'en-US';
+          window.speechSynthesis.speak(utterance);
+        };
+
+        return (
+          <div className="container">
+            <h1 className="title">Bible Infinite Scroll</h1>
             <div className="mb-4">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="예: 창세기 1:1~5, 시편 23"
-                className="bg-gray-800 text-white p-2 rounded w-full"
+                className="input"
               />
               <button
                 onClick={searchVerses}
-                className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded mt-2"
+                className="button"
               >
                 검색
               </button>
             </div>
-            {loading && <p className="text-gray-400 mb-4">검색 중...</p>}
-            {error && <div className="mb-4 text-red-500">{error}</div>}
+            {loading && <p className="loading">검색 중...</p>}
+            {error && <div className="error">{error}</div>}
             {searchResults.length > 0 && (
               <div className="mb-4">
-                <h2 className="text-lg font-semibold">검색 결과</h2>
+                <h2 className="subtitle">검색 결과</h2>
                 {searchResults.map((result, idx) => (
-                  <div key={idx} className="border-b border-gray-700 py-2">
+                  <div key={idx} className="verse">
                     <input
                       type="checkbox"
                       onChange={() => addVerses(result)}
@@ -222,7 +284,7 @@
             )}
             <div
               ref={scrollRef}
-              className="h-[70vh] overflow-hidden"
+              className="scroll-area"
             >
               {verses.length > 0 ? (
                 verses.concat(verses).map((verse, idx) => (
@@ -236,11 +298,11 @@
               )}
             </div>
           </div>
-        </div>
-      );
-    };
+        );
+      };
 
-    ReactDOM.render(<App />, document.getElementById('root'));
+      ReactDOM.render(<App />, document.getElementById('root'));
+    }
   </script>
 </body>
 </html>
