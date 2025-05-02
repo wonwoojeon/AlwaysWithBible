@@ -115,6 +115,27 @@
         var scrollPosState = useState(0);
         var scrollPos = scrollPosState[0];
         var setScrollPos = scrollPosState[1];
+        var koreanDataState = useState(null);
+        var koreanData = koreanDataState[0];
+        var setKoreanData = koreanDataState[1];
+
+        // Load ko_rev.json on mount
+        useEffect(function() {
+          console.log('Fetching ko_rev.json...');
+          fetch('/assets/ko_rev.json')
+            .then(function(response) {
+              if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status);
+              return response.json();
+            })
+            .then(function(data) {
+              setKoreanData(data);
+              console.log('ko_rev.json loaded:', data);
+            })
+            .catch(function(err) {
+              console.error('Error loading ko_rev.json:', err);
+              setError('한글 성경 데이터를 불러오지 못했습니다.');
+            });
+        }, []);
 
         // Load saved verses from localStorage
         useEffect(function() {
@@ -172,7 +193,7 @@
           console.log('Speech rate updated:', newSpeechRate);
         }, [scrollSpeed]);
 
-        // Search verses using GetBible (KJV) and aromkimm/bible (Korean)
+        // Search verses using GetBible (KJV) and local ko_rev.json
         var searchVerses = async function() {
           setLoading(true);
           setError('');
@@ -248,6 +269,10 @@
               '유다서': 'Jude',
               '요한계시록': 'Revelation'
             };
+            var bookMapReverse = {};
+            for (var key in bookMap) {
+              bookMapReverse[bookMap[key]] = key;
+            }
 
             for (var i = 0; i < queries.length; i++) {
               var query = queries[i];
@@ -283,22 +308,33 @@
                 console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError);
               }
 
-              // 한글(개역개정) 구절 가져오기 - 직접 URL 사용 (임시)
+              // 한글(개역개정) 구절 가져오기 - ko_rev.json에서 필터링
               var krvText = '한글 구절을 불러오지 못했습니다.';
               try {
-                console.log('Fetching Korean data for:', book);
-                var koreanResponse = await fetch(
-                  'https://raw.githubusercontent.com/aromkimm/bible/main/korean/' + book + '.json'
-                );
-                if (!koreanResponse.ok) throw new Error('Korean Bible 요청 실패: ' + koreanResponse.status);
-                var koreanData = await koreanResponse.json();
-                var chapterData = koreanData.find(function(ch) { return ch.chapter === parseInt(chapter); });
-                if (chapterData) {
-                  var verses = chapterData.verses.filter(function(v) { return v.verse >= startVerse && v.verse <= endVerse; });
-                  krvText = verses.map(function(v) { return v.verse + ': ' + v.text; }).join(' ');
-                  console.log('Korean data fetched:', krvText);
+                if (!koreanData) throw new Error('한글 성경 데이터가 로드되지 않았습니다.');
+                var bookName = bookMapReverse[book] || book;
+                var bookData = koreanData.find(function(b) { return b.name === bookName; });
+                if (bookData) {
+                  var chapterData = bookData.chapters[parseInt(chapter) - 1];
+                  if (chapterData) {
+                    var verses = [];
+                    for (var v = startVerse; v <= endVerse; v++) {
+                      var verseText = chapterData[v - 1];
+                      if (verseText) {
+                        verses.push(v + ': ' + verseText);
+                      }
+                    }
+                    if (verses.length > 0) {
+                      krvText = verses.join(' ');
+                      console.log('Korean data fetched:', krvText);
+                    } else {
+                      throw new Error('해당 구절을 찾을 수 없습니다.');
+                    }
+                  } else {
+                    throw new Error('해당 장을 찾을 수 없습니다.');
+                  }
                 } else {
-                  throw new Error('해당 장을 찾을 수 없습니다.');
+                  throw new Error('해당 책을 찾을 수 없습니다.');
                 }
               } catch (krvError) {
                 console.warn('한글 구절 데이터를 가져오지 못했습니다:', krvError);
