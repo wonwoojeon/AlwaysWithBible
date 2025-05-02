@@ -99,9 +99,9 @@
         const [scrollPos, setScrollPos] = useState(0);
 
         // Load saved verses from localStorage
-        useEffect(() => {
+        useEffect(function() {
           console.log('Loading verses from localStorage...');
-          const saved = localStorage.getItem('verses');
+          var saved = localStorage.getItem('verses');
           if (saved) {
             try {
               setVerses(JSON.parse(saved));
@@ -114,7 +114,7 @@
         }, []);
 
         // Save verses to localStorage
-        useEffect(() => {
+        useEffect(function() {
           console.log('Saving verses to localStorage:', verses);
           try {
             localStorage.setItem('verses', JSON.stringify(verses));
@@ -125,22 +125,22 @@
         }, [verses]);
 
         // Auto-scrolling logic
-        useEffect(() => {
+        useEffect(function() {
           console.log('Starting auto-scroll with speed:', scrollSpeed);
-          const scroll = () => {
-            setScrollPos((prev) => {
+          var scroll = function() {
+            setScrollPos(function(prev) {
               if (!scrollRef.current) return prev;
-              const maxHeight = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
+              var maxHeight = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
               if (prev >= maxHeight) return 0;
               return prev + scrollSpeed;
             });
           };
-          const interval = setInterval(scroll, 16);
-          return () => clearInterval(interval);
+          var interval = setInterval(scroll, 16);
+          return function() { clearInterval(interval); };
         }, [scrollSpeed]);
 
         // Update scroll position
-        useEffect(() => {
+        useEffect(function() {
           if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollPos;
             console.log('Scroll position updated:', scrollPos);
@@ -148,21 +148,21 @@
         }, [scrollPos]);
 
         // 스크롤 속도에 따라 음성 재생 속도 자동 조절
-        useEffect(() => {
-          const newSpeechRate = 0.5 + (scrollSpeed - 0.1) * (1.5 / 1.9);
+        useEffect(function() {
+          var newSpeechRate = 0.5 + (scrollSpeed - 0.1) * (1.5 / 1.9);
           setSpeechRate(Math.min(Math.max(newSpeechRate, 0.5), 2));
           console.log('Speech rate updated:', newSpeechRate);
         }, [scrollSpeed]);
 
         // Search verses using GetBible (KJV) and aromkimm/bible (Korean)
-        const searchVerses = async () => {
+        var searchVerses = async function() {
           setLoading(true);
           setError('');
           console.log('Starting search with input:', input);
           try {
-            const queries = input.split(',').map(q => q.trim());
-            const results = [];
-            const bookMap = {
+            var queries = input.split(',').map(function(q) { return q.trim(); });
+            var results = [];
+            var bookMap = {
               '창세기': 'Genesis',
               '출애굽기': 'Exodus',
               '레위기': 'Leviticus',
@@ -231,50 +231,53 @@
               '요한계시록': 'Revelation'
             };
 
-            for (const query of queries) {
+            for (var i = 0; i < queries.length; i++) {
+              var query = queries[i];
               console.log('Processing query:', query);
-              const bookMatch = query.match(/^(\D+)/)?.[1]?.trim();
-              const book = bookMap[bookMatch] || bookMatch;
-              const verseMatch = query.match(/(\d+:\d+(~\d+)?)/)?.[0]?.replace('~', '-');
+              var bookMatchResult = query.match(/^(\D+)/);
+              var bookMatch = bookMatchResult && bookMatchResult[1] ? bookMatchResult[1].trim() : null;
+              var book = bookMap[bookMatch] || bookMatch;
+              var verseMatchResult = query.match(/(\d+:\d+(~\d+)?)/);
+              var verseMatch = verseMatchResult && verseMatchResult[0] ? verseMatchResult[0].replace('~', '-') : null;
               if (!book || !verseMatch) {
                 throw new Error('잘못된 구절 형식입니다. 예: 창세기 1:1~5');
               }
-              const formattedQuery = `${book} ${verseMatch}`;
-              const chapter = verseMatch.split('-')[0].split(':')[0];
-              const verseRange = verseMatch.split('-');
-              const startVerse = parseInt(verseRange[0].split(':')[1]);
-              const endVerse = verseRange[1] ? parseInt(verseRange[1]) : startVerse;
+              var formattedQuery = book + ' ' + verseMatch;
+              var chapter = verseMatch.split('-')[0].split(':')[0];
+              var verseRange = verseMatch.split('-');
+              var startVerse = parseInt(verseRange[0].split(':')[1]);
+              var endVerse = verseRange[1] ? parseInt(verseRange[1]) : startVerse;
 
               // 영어(KJV) 구절 가져오기 - GetBible API (프록시 사용)
-              let kjvText = '영어 구절을 불러오지 못했습니다.';
+              var kjvText = '영어 구절을 불러오지 못했습니다.';
               try {
                 console.log('Fetching KJV data for:', formattedQuery);
-                const kjvResponse = await fetch(
-                  `/api/getbible/v2/kjv/${formattedQuery}`
+                var kjvResponse = await fetch(
+                  '/api/getbible/v2/kjv/' + formattedQuery
                 );
                 if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status);
-                const kjvData = await kjvResponse.json();
+                var kjvData = await kjvResponse.json();
                 if (kjvData.error) throw new Error(kjvData.error);
-                const kjvKey = Object.keys(kjvData)[0];
-                kjvText = kjvData[kjvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+                var kjvKey = Object.keys(kjvData)[0];
+                kjvText = kjvData[kjvKey].verses.map(function(v) { return v.verse + ': ' + v.text; }).join(' ');
                 console.log('KJV data fetched:', kjvText);
               } catch (kjvError) {
                 console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError);
               }
 
               // 한글(개역개정) 구절 가져오기 - aromkimm/bible (프록시 사용)
-              let krvText = '한글 구절을 불러오지 못했습니다.';
+              var krvText = '한글 구절을 불러오지 못했습니다.';
               try {
                 console.log('Fetching Korean data for:', book);
-                const koreanResponse = await fetch(
-                  `/api/koreanbible/${book}.json`
+                var koreanResponse = await fetch(
+                  '/api/koreanbible/' + book + '.json'
                 );
                 if (!koreanResponse.ok) throw new Error('Korean Bible 요청 실패: ' + koreanResponse.status);
-                const koreanData = await koreanResponse.json();
-                const chapterData = koreanData.find(ch => ch.chapter === parseInt(chapter));
+                var koreanData = await koreanResponse.json();
+                var chapterData = koreanData.find(function(ch) { return ch.chapter === parseInt(chapter); });
                 if (chapterData) {
-                  const verses = chapterData.verses.filter(v => v.verse >= startVerse && v.verse <= endVerse);
-                  krvText = verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+                  var verses = chapterData.verses.filter(function(v) { return v.verse >= startVerse && v.verse <= endVerse; });
+                  krvText = verses.map(function(v) { return v.verse + ': ' + v.text; }).join(' ');
                   console.log('Korean data fetched:', krvText);
                 } else {
                   throw new Error('해당 장을 찾을 수 없습니다.');
@@ -283,7 +286,7 @@
                 console.warn('한글 구절 데이터를 가져오지 못했습니다:', krvError);
               }
 
-              results.push({ query, kjvText, krvText });
+              results.push({ query: query, kjvText: kjvText, krvText: krwText });
             }
             setSearchResults(results);
             console.log('Search results:', results);
@@ -296,18 +299,18 @@
         };
 
         // Add selected verses
-        const addVerses = (verse) => {
+        var addVerses = function(verse) {
           console.log('Adding verse to scroll list:', verse);
-          setVerses([...verses, verse]);
+          setVerses(verses.concat([verse]));
           setSearchResults([]);
           setInput('');
-          const utterance = new SpeechSynthesisUtterance(verse.kjvText);
+          var utterance = new SpeechSynthesisUtterance(verse.kjvText);
           utterance.lang = 'en-US';
           utterance.rate = speechRate;
           window.speechSynthesis.speak(utterance);
 
           // 한글 음성 재생
-          const krUtterance = new SpeechSynthesisUtterance(verse.krvText);
+          var krUtterance = new SpeechSynthesisUtterance(verse.krvText);
           krUtterance.lang = 'ko-KR';
           krUtterance.rate = speechRate;
           window.speechSynthesis.speak(krUtterance);
@@ -320,7 +323,7 @@
               <input
                 type="text"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={function(e) { setInput(e.target.value); }}
                 placeholder="예: 창세기 1:1~5, 시편 23"
                 className="input"
               />
@@ -339,7 +342,7 @@
                 max="2"
                 step="0.1"
                 value={scrollSpeed}
-                onChange={(e) => setScrollSpeed(parseFloat(e.target.value))}
+                onChange={function(e) { setScrollSpeed(parseFloat(e.target.value)); }}
                 className="slider"
               />
               <p>음성 재생 속도: {speechRate.toFixed(1)}</p>
@@ -349,16 +352,18 @@
             {searchResults.length > 0 && (
               <div className="mb-4">
                 <h2 className="subtitle">검색 결과</h2>
-                {searchResults.map((result, idx) => (
-                  <div key={idx} className="verse">
-                    <input
-                      type="checkbox"
-                      onChange={() => addVerses(result)}
-                    />
-                    <span className="ml-2">{result.query}: {result.kjvText} (KJV)</span>
-                    <p className="ml-6">{result.krvText} (개역개정)</p>
-                  </div>
-                ))}
+                {searchResults.map(function(result, idx) {
+                  return (
+                    <div key={idx} className="verse">
+                      <input
+                        type="checkbox"
+                        onChange={function() { addVerses(result); }}
+                      />
+                      <span className="ml-2">{result.query}: {result.kjvText} (KJV)</span>
+                      <p className="ml-6">{result.krvText} (개역개정)</p>
+                    </div>
+                  );
+                })}
               </div>
             )}
             <div
@@ -366,12 +371,14 @@
               className="scroll-area"
             >
               {verses.length > 0 ? (
-                verses.concat(verses).map((verse, idx) => (
-                  <div key={idx} className="py-4">
-                    <p className="text-lg">{verse.kjvText} (KJV)</p>
-                    <p className="text-lg">{verse.krvText} (개역개정)</p>
-                  </div>
-                ))
+                verses.concat(verses).map(function(verse, idx) {
+                  return (
+                    <div key={idx} className="py-4">
+                      <p className="text-lg">{verse.kjvText} (KJV)</p>
+                      <p className="text-lg">{verse.krvText} (개역개정)</p>
+                    </div>
+                  );
+                })
               ) : (
                 <p>구절을 추가하세요.</p>
               )}
