@@ -135,7 +135,6 @@
   <div id="root"></div>
   <audio id="bgm" loop></audio>
   <script type="text/babel">
-    // CDN 로드 확인
     if (!window.React || !window.ReactDOM || !window.Babel) {
       console.error('Failed to load required scripts (React, ReactDOM, or Babel). Please check your network or CDN availability.');
       document.getElementById('root').innerHTML = '<p class="error">스크립트 로드 실패: 네트워크를 확인하거나 나중에 다시 시도하세요. 대안으로 CDN 대신 로컬 파일을 사용할 수 있습니다.</p>';
@@ -187,7 +186,6 @@
         var koreanData = koreanDataState[0];
         var setKoreanData = koreanDataState[1];
 
-        // Load ko_rev.json on mount
         useEffect(function() {
           console.log('Fetching ko_rev.json...');
           fetch('/assets/ko_rev.json')
@@ -205,7 +203,6 @@
             });
         }, []);
 
-        // Load saved verses from localStorage
         useEffect(function() {
           console.log('Loading verses from localStorage...');
           var saved = localStorage.getItem('verses');
@@ -220,7 +217,6 @@
           }
         }, []);
 
-        // Save verses to localStorage
         useEffect(function() {
           console.log('Saving verses to localStorage:', verses);
           try {
@@ -231,7 +227,6 @@
           }
         }, [verses]);
 
-        // Auto-scrolling logic
         useEffect(function() {
           console.log('Starting auto-scroll with speed:', scrollSpeed);
           var scroll = function() {
@@ -246,7 +241,6 @@
           return function() { clearInterval(interval); };
         }, [scrollSpeed]);
 
-        // Update scroll position
         useEffect(function() {
           if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollPos;
@@ -254,36 +248,30 @@
           }
         }, [scrollPos]);
 
-        // 스크롤 속도에 따라 음성 재생 속도 자동 조절
         useEffect(function() {
           var newSpeechRate = 0.5 + (scrollSpeed - 0.1) * (1.5 / 1.9);
           setSpeechRate(Math.min(Math.max(newSpeechRate, 0.5), 2));
           console.log('Speech rate updated:', newSpeechRate);
         }, [scrollSpeed]);
 
-        // 선택한 구절 슬라이딩 애니메이션 속도 조절
-        var animationDuration = verses.length > 0 ? 10 + verses.length * 2 : 10; // 구절 개수에 따라 속도 조절
+        var animationDuration = verses.length > 0 ? 10 + verses.length * 2 : 10;
 
-        // 음성 및 음악 켜기/끄기
         var toggleSound = function() {
           if (isSoundOn) {
-            window.speechSynthesis.cancel(); // 음성 재생 중지
-            document.getElementById('bgm').pause(); // 음악 일시정지
+            window.speechSynthesis.cancel();
+            document.getElementById('bgm').pause();
           } else {
-            document.getElementById('bgm').play(); // 음악 재생
-            // 음성은 addVerses에서 다시 재생됨
+            document.getElementById('bgm').play();
           }
           setIsSoundOn(!isSoundOn);
         };
 
-        // Delete verse from the list
         var deleteVerse = function(index) {
           console.log('Deleting verse at index:', index);
           var updatedVerses = verses.filter(function(_, i) { return i !== index; });
           setVerses(updatedVerses);
         };
 
-        // Search verses using Bible API (KJV) and local ko_rev.json
         var searchVerses = async function() {
           setLoading(true);
           setError('');
@@ -384,21 +372,21 @@
                 endVerse = verseRange[1] ? parseInt(verseRange[1]) : startVerse;
               } else {
                 startVerse = 1;
-                endVerse = Infinity; // 장 전체를 표시하기 위해
+                endVerse = Infinity;
               }
               var formattedQuery = book + '+' + chapter;
               console.log('Formatted query for API:', formattedQuery);
 
-              // 영어(KJV) 구절 가져오기 - Bible API
+              // Fetch English (KJV) verses from Bible API
               var kjvText = '영어 구절을 불러오지 못했습니다.';
               try {
                 console.log('Fetching KJV data for:', formattedQuery);
                 var url = 'https://bible-api.com/' + encodeURIComponent(formattedQuery) + '?translation=kjv';
                 if (endVerse !== Infinity) {
                   if (startVerse === endVerse) {
-                    url += `:${startVerse}`; // 단일 절 검색 (예: Psalms+2:3)
+                    url += `:${startVerse}`;
                   } else {
-                    url += `:${startVerse}-${endVerse}`; // 범위 절 검색 (예: Psalms+2:3-4)
+                    url += `:${startVerse}-${endVerse}`;
                   }
                 }
                 console.log('KJV API URL:', url);
@@ -407,30 +395,22 @@
                 var kjvData = await kjvResponse.json();
                 console.log('KJV API response:', kjvData);
                 if (kjvData.error) throw new Error(kjvData.error);
-                var verses = [];
-                if (endVerse === Infinity) {
-                  // 장 전체 검색
-                  verses = kjvData.verses.map(function(verseData) {
-                    return verseData.verse + ': ' + verseData.text.trim();
-                  });
-                } else {
-                  // 특정 절 검색
-                  verses = kjvData.verses.map(function(verseData) {
-                    return verseData.verse + ': ' + verseData.text.trim();
-                  });
-                }
-                if (verses.length > 0) {
-                  kjvText = verses.join(' ');
-                  console.log('KJV data fetched:', kjvText);
-                } else {
+
+                // Process the verses regardless of whether it's a range or full chapter
+                if (!kjvData.verses || kjvData.verses.length === 0) {
                   throw new Error('해당 구절을 찾을 수 없습니다.');
                 }
+                var verses = kjvData.verses.map(function(verseData) {
+                  return verseData.verse + ': ' + verseData.text.trim();
+                });
+                kjvText = verses.join(' ');
+                console.log('KJV data fetched:', kjvText);
               } catch (kjvError) {
                 console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError.message);
                 kjvText = '영어 구절을 불러오지 못했습니다: ' + kjvError.message;
               }
 
-              // 한글(개역개정) 구절 가져오기 - ko_rev.json에서 필터링
+              // Fetch Korean verses from ko_rev.json
               var krvText = '한글 구절을 불러오지 못했습니다.';
               try {
                 if (!koreanData) throw new Error('한글 성경 데이터가 로드되지 않았습니다.');
@@ -478,7 +458,6 @@
           }
         };
 
-        // Add selected verses
         var addVerses = function(verse) {
           console.log('Adding verse to scroll list:', verse);
           setVerses(verses.concat([verse]));
@@ -490,7 +469,6 @@
             utterance.rate = speechRate;
             window.speechSynthesis.speak(utterance);
 
-            // 한글 음성 재생
             var krUtterance = new SpeechSynthesisUtterance(verse.krvText);
             krUtterance.lang = 'ko-KR';
             krUtterance.rate = speechRate;
