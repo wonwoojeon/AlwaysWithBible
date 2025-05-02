@@ -381,14 +381,8 @@
               var kjvText = '영어 구절을 불러오지 못했습니다.';
               try {
                 console.log('Fetching KJV data for:', formattedQuery);
+                // 항상 전체 장을 요청 (범위 지정 없이)
                 var url = 'https://bible-api.com/' + encodeURIComponent(formattedQuery) + '?translation=kjv';
-                if (endVerse !== Infinity) {
-                  if (startVerse === endVerse) {
-                    url += `:${startVerse}`;
-                  } else {
-                    url += `:${startVerse}-${endVerse}`;
-                  }
-                }
                 console.log('KJV API URL:', url);
                 var kjvResponse = await fetch(url);
                 if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status + ' ' + kjvResponse.statusText);
@@ -396,13 +390,21 @@
                 console.log('KJV API response:', kjvData);
                 if (kjvData.error) throw new Error(kjvData.error);
 
-                // Process the verses regardless of whether it's a range or full chapter
+                // 클라이언트 측에서 절 범위 필터링
                 if (!kjvData.verses || kjvData.verses.length === 0) {
                   throw new Error('해당 구절을 찾을 수 없습니다.');
                 }
-                var verses = kjvData.verses.map(function(verseData) {
-                  return verseData.verse + ': ' + verseData.text.trim();
-                });
+                var verses = kjvData.verses
+                  .filter(function(verseData) {
+                    // startVerse와 endVerse에 따라 필터링
+                    return endVerse === Infinity || (verseData.verse >= startVerse && verseData.verse <= endVerse);
+                  })
+                  .map(function(verseData) {
+                    return verseData.verse + ': ' + verseData.text.trim();
+                  });
+                if (verses.length === 0) {
+                  throw new Error('해당 절 범위를 찾을 수 없습니다.');
+                }
                 kjvText = verses.join(' ');
                 console.log('KJV data fetched:', kjvText);
               } catch (kjvError) {
