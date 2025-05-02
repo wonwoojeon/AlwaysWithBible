@@ -307,7 +307,7 @@
               '역대상': '1 Chronicles',
               '역대하': '2 Chronicles',
               '에스라': 'Ezra',
-              '느헤미야': "Nehemiah",
+              '느헤미야': 'Nehemiah',
               '에스더': 'Esther',
               '욥기': 'Job',
               '시편': 'Psalms',
@@ -400,11 +400,8 @@
                 if (kjvData.error) throw new Error(kjvData.error);
                 var kjvKey = Object.keys(kjvData)[0];
                 kjvText = kjvData[kjvKey].verses.map(function(v) { 
-                  if (endVerse === Infinity || (v.verse >= startVerse && v.verse <= endVerse)) {
-                    return v.verse + ': ' + v.text;
-                  }
-                  return null;
-                }).filter(Boolean).join(' ');
+                  return v.verse + ': ' + v.text;
+                }).join(' ');
                 console.log('KJV data fetched:', kjvText);
               } catch (kjvError) {
                 console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError);
