@@ -144,7 +144,7 @@
   <audio id="bgm" loop></audio>
   <script type="text/babel">
     if (!window.React || !window.ReactDOM || !window.Babel) {
-      console.error('Failed to load required scripts (React, ReactDOM, or Babel). Please check your network or CDN availability. URLs: React: https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js, ReactDOM: https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js, Babel: https://cdn.jsdelivr.net/npm/babel-standalone@6.26.0/babel.min.js');
+      console.error('Failed to load required scripts (React, ReactDOM, or Babel). Please check your network or CDN availability.');
       document.getElementById('root').innerHTML = '<p class="error">스크립트 로드 실패: 네트워크를 확인하거나 나중에 다시 시도하세요. 대안으로 CDN 대신 로컬 파일을 사용할 수 있습니다.</p>';
     } else {
       console.log('CDN scripts loaded successfully.');
@@ -188,7 +188,7 @@
         var setIsCollapsed = isCollapsedState[1];
         var isSoundOnState = useState(true);
         var isSoundOn = isSoundOnState[0];
-        var setIsSoundOn = isSoundOnState[1]; // 오타 수정: setIsSound citasOn → setIsSoundOn
+        var setIsSound citasOn = isSoundOnState[1];
         var scrollRef = useRef(null);
         var scrollPosState = useState(0);
         var scrollPos = scrollPosState[0];
@@ -201,7 +201,7 @@
           console.log('Fetching ko_rev.json...');
           fetch('/assets/ko_rev.json')
             .then(function(response) {
-              if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText + '. Please ensure the file exists in the /assets directory on your server.');
+              if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText);
               return response.json();
             })
             .then(function(data) {
@@ -210,7 +210,7 @@
             })
             .catch(function(err) {
               console.error('Error loading ko_rev.json:', err.message);
-              setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message + '. 서버에 /assets/ko_rev.json 파일이 있는지 확인해주세요.');
+              setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message);
             });
         }, []);
 
@@ -223,7 +223,7 @@
               console.log('Verses loaded from localStorage:', saved);
             } catch (e) {
               console.error('Failed to parse verses from localStorage:', e);
-              setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
+              setError('저장된 구절을 불러오지 못했습니다.');
             }
           }
         }, []);
@@ -234,7 +234,7 @@
             localStorage.setItem('verses', JSON.stringify(verses));
           } catch (e) {
             console.error('Failed to save verses to localStorage:', e);
-            setError('구절을 저장하지 못했습니다: ' + e.message);
+            setError('구절을 저장하지 못했습니다.');
           }
         }, [verses]);
 
@@ -242,10 +242,11 @@
           console.log('Starting auto-scroll with speed:', scrollSpeed);
           var scroll = function() {
             setScrollPos(function(prev) {
-              if (!scrollRef.current || verses.length === 0) return prev; // verses가 비어 있거나 scrollRef가 없으면 스크롤하지 않음
+              if (!scrollRef.current) return prev;
               var maxHeight = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
-              if (maxHeight <= 0) return prev;
+              if (maxHeight <= 0) return prev; // maxHeight가 0 이하일 경우 스크롤하지 않음
               var newPos = prev + scrollSpeed;
+              // maxHeight를 초과하면 끊김 없이 이어지도록 scrollPos 조정
               if (newPos >= maxHeight) {
                 newPos = newPos % maxHeight;
               }
@@ -254,7 +255,7 @@
           };
           var interval = setInterval(scroll, 16);
           return function() { clearInterval(interval); };
-        }, [scrollSpeed, verses]); // verses를 의존성 배열에 추가하여 verses 변경 시에도 스크롤 로직이 올바르게 동작
+        }, [scrollSpeed]);
 
         useEffect(function() {
           if (scrollRef.current) {
@@ -426,7 +427,7 @@
               var krvText = '한글 구절을 불러오지 못했습니다.';
               try {
                 if (!koreanData) throw new Error('한글 성경 데이터가 로드되지 않았습니다.');
-                var bookName = book mapReverse[book] || book;
+                var bookName = bookMapReverse[book] || book;
                 console.log('Looking for book:', bookName);
                 var bookData = koreanData.find(function(b) { return b.name === bookName; });
                 if (bookData) {
@@ -686,7 +687,7 @@
                   <input
                     type="range"
                     min="400"
-                    max="1300"
+                    max="1300" // 최대값을 1300으로 변경
                     step="10"
                     value={containerWidth}
                     onChange={function(e) { setContainerWidth(parseInt(e.target.value)); }}
