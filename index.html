@@ -84,6 +84,7 @@
       console.error('Failed to load required scripts (React, ReactDOM, or Babel). Please check your network or CDN availability.');
       document.getElementById('root').innerHTML = '<p class="error">스크립트 로드 실패: 네트워크를 확인하거나 나중에 다시 시도하세요. 대안으로 CDN 대신 로컬 파일을 사용할 수 있습니다.</p>';
     } else {
+      console.log('CDN scripts loaded successfully.');
       const { useState, useEffect, useRef } = React;
 
       const App = () => {
@@ -99,10 +100,12 @@
 
         // Load saved verses from localStorage
         useEffect(() => {
+          console.log('Loading verses from localStorage...');
           const saved = localStorage.getItem('verses');
           if (saved) {
             try {
               setVerses(JSON.parse(saved));
+              console.log('Verses loaded from localStorage:', saved);
             } catch (e) {
               console.error('Failed to parse verses from localStorage:', e);
               setError('저장된 구절을 불러오지 못했습니다.');
@@ -112,6 +115,7 @@
 
         // Save verses to localStorage
         useEffect(() => {
+          console.log('Saving verses to localStorage:', verses);
           try {
             localStorage.setItem('verses', JSON.stringify(verses));
           } catch (e) {
@@ -122,6 +126,7 @@
 
         // Auto-scrolling logic
         useEffect(() => {
+          console.log('Starting auto-scroll with speed:', scrollSpeed);
           const scroll = () => {
             setScrollPos((prev) => {
               if (!scrollRef.current) return prev;
@@ -138,6 +143,7 @@
         useEffect(() => {
           if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollPos;
+            console.log('Scroll position updated:', scrollPos);
           }
         }, [scrollPos]);
 
@@ -145,12 +151,14 @@
         useEffect(() => {
           const newSpeechRate = 0.5 + (scrollSpeed - 0.1) * (1.5 / 1.9);
           setSpeechRate(Math.min(Math.max(newSpeechRate, 0.5), 2));
+          console.log('Speech rate updated:', newSpeechRate);
         }, [scrollSpeed]);
 
         // Search verses using GetBible (KJV) and aromkimm/bible (Korean)
         const searchVerses = async () => {
           setLoading(true);
           setError('');
+          console.log('Starting search with input:', input);
           try {
             const queries = input.split(',').map(q => q.trim());
             const results = [];
@@ -224,10 +232,13 @@
             };
 
             for (const query of queries) {
+              console.log('Processing query:', query);
               const bookMatch = query.match(/^(\D+)/)?.[1]?.trim();
               const book = bookMap[bookMatch] || bookMatch;
               const verseMatch = query.match(/(\d+:\d+(~\d+)?)/)?.[0]?.replace('~', '-');
-              if (!book || !verseMatch) throw new Error('잘못된 구절 형식입니다. 예: 창세기 1:1~5');
+              if (!book || !verseMatch) {
+                throw new Error('잘못된 구절 형식입니다. 예: 창세기 1:1~5');
+              }
               const formattedQuery = `${book} ${verseMatch}`;
               const chapter = verseMatch.split('-')[0].split(':')[0];
               const verseRange = verseMatch.split('-');
@@ -237,6 +248,7 @@
               // 영어(KJV) 구절 가져오기 - GetBible API (프록시 사용)
               let kjvText = '영어 구절을 불러오지 못했습니다.';
               try {
+                console.log('Fetching KJV data for:', formattedQuery);
                 const kjvResponse = await fetch(
                   `/api/getbible/v2/kjv/${formattedQuery}`
                 );
@@ -245,6 +257,7 @@
                 if (kjvData.error) throw new Error(kjvData.error);
                 const kjvKey = Object.keys(kjvData)[0];
                 kjvText = kjvData[kjvKey].verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+                console.log('KJV data fetched:', kjvText);
               } catch (kjvError) {
                 console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError);
               }
@@ -252,6 +265,7 @@
               // 한글(개역개정) 구절 가져오기 - aromkimm/bible (프록시 사용)
               let krvText = '한글 구절을 불러오지 못했습니다.';
               try {
+                console.log('Fetching Korean data for:', book);
                 const koreanResponse = await fetch(
                   `/api/koreanbible/${book}.json`
                 );
@@ -261,6 +275,7 @@
                 if (chapterData) {
                   const verses = chapterData.verses.filter(v => v.verse >= startVerse && v.verse <= endVerse);
                   krvText = verses.map(v => `${v.verse}: ${v.text}`).join(' ');
+                  console.log('Korean data fetched:', krvText);
                 } else {
                   throw new Error('해당 장을 찾을 수 없습니다.');
                 }
@@ -271,6 +286,7 @@
               results.push({ query, kjvText, krvText });
             }
             setSearchResults(results);
+            console.log('Search results:', results);
           } catch (error) {
             console.error('Error fetching verses:', error);
             setError('구절을 불러오지 못했습니다: ' + error.message);
@@ -281,6 +297,7 @@
 
         // Add selected verses
         const addVerses = (verse) => {
+          console.log('Adding verse to scroll list:', verse);
           setVerses([...verses, verse]);
           setSearchResults([]);
           setInput('');
@@ -364,6 +381,7 @@
       };
 
       ReactDOM.render(<App />, document.getElementById('root'));
+      console.log('App rendered successfully.');
     }
   </script>
 </body>
