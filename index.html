@@ -283,12 +283,12 @@
                 console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError);
               }
 
-              // 한글(개역개정) 구절 가져오기 - aromkimm/bible (프록시 사용)
+              // 한글(개역개정) 구절 가져오기 - 직접 URL 사용 (임시)
               var krvText = '한글 구절을 불러오지 못했습니다.';
               try {
                 console.log('Fetching Korean data for:', book);
                 var koreanResponse = await fetch(
-                  '/api/koreanbible/' + book + '.json'
+                  'https://raw.githubusercontent.com/aromkimm/bible/main/korean/' + book + '.json'
                 );
                 if (!koreanResponse.ok) throw new Error('Korean Bible 요청 실패: ' + koreanResponse.status);
                 var koreanData = await koreanResponse.json();
@@ -302,7 +302,6 @@
                 }
               } catch (krvError) {
                 console.warn('한글 구절 데이터를 가져오지 못했습니다:', krvError);
-                // 한글 구절 요청이 실패하더라도 영어 구절은 표시되도록
                 krvText = '한글 구절을 불러오지 못했습니다.';
               }
 
