@@ -188,7 +188,7 @@
         var setIsCollapsed = isCollapsedState[1];
         var isSoundOnState = useState(true);
         var isSoundOn = isSoundOnState[0];
-        var setIsSoundOn = isSoundOnState[1]; // 오타 수정: setIsSound citasOn → setIsSoundOn
+        var setIsSoundOn = isSoundOnState[1]; // 수정: setIsSound citasOn → setIsSoundOn
         var scrollRef = useRef(null);
         var scrollPosState = useState(0);
         var scrollPos = scrollPosState[0];
@@ -242,7 +242,7 @@
           console.log('Starting auto-scroll with speed:', scrollSpeed);
           var scroll = function() {
             setScrollPos(function(prev) {
-              if (!scrollRef.current || verses.length === 0) return prev; // verses가 비어 있거나 scrollRef가 없으면 스크롤하지 않음
+              if (!scrollRef.current || verses.length === 0) return prev;
               var maxHeight = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
               if (maxHeight <= 0) return prev;
               var newPos = prev + scrollSpeed;
@@ -254,7 +254,7 @@
           };
           var interval = setInterval(scroll, 16);
           return function() { clearInterval(interval); };
-        }, [scrollSpeed, verses]); // verses를 의존성 배열에 추가하여 verses 변경 시에도 스크롤 로직이 올바르게 동작
+        }, [scrollSpeed, verses]);
 
         useEffect(function() {
           if (scrollRef.current) {
@@ -426,7 +426,7 @@
               var krvText = '한글 구절을 불러오지 못했습니다.';
               try {
                 if (!koreanData) throw new Error('한글 성경 데이터가 로드되지 않았습니다.');
-                var bookName = book mapReverse[book] || book;
+                var bookName = bookMapReverse[book] || book; // 수정: book mapReverse → bookMapReverse
                 console.log('Looking for book:', bookName);
                 var bookData = koreanData.find(function(b) { return b.name === bookName; });
                 if (bookData) {
