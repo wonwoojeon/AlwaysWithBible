@@ -85,18 +85,36 @@
       document.getElementById('root').innerHTML = '<p class="error">스크립트 로드 실패: 네트워크를 확인하거나 나중에 다시 시도하세요. 대안으로 CDN 대신 로컬 파일을 사용할 수 있습니다.</p>';
     } else {
       console.log('CDN scripts loaded successfully.');
-      const { useState, useEffect, useRef } = React;
+      var useState = React.useState;
+      var useEffect = React.useEffect;
+      var useRef = React.useRef;
 
-      const App = () => {
-        const [verses, setVerses] = useState([]);
-        const [input, setInput] = useState('');
-        const [searchResults, setSearchResults] = useState([]);
-        const [error, setError] = useState('');
-        const [loading, setLoading] = useState(false);
-        const [scrollSpeed, setScrollSpeed] = useState(0.5); // 스크롤 속도 (픽셀/프레임)
-        const [speechRate, setSpeechRate] = useState(1); // 음성 재생 속도
-        const scrollRef = useRef(null);
-        const [scrollPos, setScrollPos] = useState(0);
+      var App = function() {
+        var versesState = useState([]);
+        var verses = versesState[0];
+        var setVerses = versesState[1];
+        var inputState = useState('');
+        var input = inputState[0];
+        var setInput = inputState[1];
+        var searchResultsState = useState([]);
+        var searchResults = searchResultsState[0];
+        var setSearchResults = searchResultsState[1];
+        var errorState = useState('');
+        var error = errorState[0];
+        var setError = errorState[1];
+        var loadingState = useState(false);
+        var loading = loadingState[0];
+        var setLoading = loadingState[1];
+        var scrollSpeedState = useState(0.5);
+        var scrollSpeed = scrollSpeedState[0];
+        var setScrollSpeed = scrollSpeedState[1];
+        var speechRateState = useState(1);
+        var speechRate = speechRateState[0];
+        var setSpeechRate = speechRateState[1];
+        var scrollRef = useRef(null);
+        var scrollPosState = useState(0);
+        var scrollPos = scrollPosState[0];
+        var setScrollPos = scrollPosState[1];
 
         // Load saved verses from localStorage
         useEffect(function() {
@@ -284,9 +302,11 @@
                 }
               } catch (krvError) {
                 console.warn('한글 구절 데이터를 가져오지 못했습니다:', krvError);
+                // 한글 구절 요청이 실패하더라도 영어 구절은 표시되도록
+                krvText = '한글 구절을 불러오지 못했습니다.';
               }
 
-              results.push({ query: query, kjvText: kjvText, krvText: krwText });
+              results.push({ query: query, kjvText: kjvText, krvText: krvText });
             }
             setSearchResults(results);
             console.log('Search results:', results);
