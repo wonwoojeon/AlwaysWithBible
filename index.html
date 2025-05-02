@@ -192,7 +192,7 @@
           console.log('Fetching ko_rev.json...');
           fetch('/assets/ko_rev.json')
             .then(function(response) {
-              if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status);
+              if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText);
               return response.json();
             })
             .then(function(data) {
@@ -200,8 +200,8 @@
               console.log('ko_rev.json loaded:', data);
             })
             .catch(function(err) {
-              console.error('Error loading ko_rev.json:', err);
-              setError('한글 성경 데이터를 불러오지 못했습니다.');
+              console.error('Error loading ko_rev.json:', err.message);
+              setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message);
             });
         }, []);
 
@@ -307,7 +307,7 @@
               '역대상': '1 Chronicles',
               '역대하': '2 Chronicles',
               '에스라': 'Ezra',
-              '느헤미야': "Nehemiah",
+              '느헤미야': 'Nehemiah',
               '에스더': 'Esther',
               '욥기': 'Job',
               '시편': 'Psalms',
@@ -387,27 +387,36 @@
                 endVerse = Infinity; // 장 전체를 표시하기 위해
               }
               var formattedQuery = book + ' ' + chapter;
+              console.log('Formatted query for API:', formattedQuery);
 
-              // 영어(KJV) 구절 가져오기 - GetBible API (프록시 사용)
+              // 영어(KJV) 구절 가져오기 - GetBible API
               var kjvText = '영어 구절을 불러오지 못했습니다.';
               try {
                 console.log('Fetching KJV data for:', formattedQuery);
                 var kjvResponse = await fetch(
-                  '/api/getbible/v2/kjv/' + formattedQuery
+                  'https://getbible.net/v2/kjv/' + encodeURIComponent(formattedQuery) + '.json'
                 );
-                if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status);
+                if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status + ' ' + kjvResponse.statusText);
                 var kjvData = await kjvResponse.json();
+                console.log('KJV API response:', kjvData);
                 if (kjvData.error) throw new Error(kjvData.error);
-                var kjvKey = Object.keys(kjvData)[0];
-                kjvText = kjvData[kjvKey].verses.map(function(v) { 
-                  if (endVerse === Infinity || (v.verse >= startVerse && v.verse <= endVerse)) {
-                    return v.verse + ': ' + v.text;
+                var versesArray = kjvData.verses;
+                var verses = [];
+                for (var v = startVerse; v <= (endVerse === Infinity ? versesArray.length : endVerse); v++) {
+                  var verseData = versesArray[v - 1];
+                  if (verseData) {
+                    verses.push(verseData.verse + ': ' + verseData.text);
                   }
-                  return null;
-                }).filter(Boolean).join(' ');
-                console.log('KJV data fetched:', kjvText);
+                }
+                if (verses.length > 0) {
+                  kjvText = verses.join(' ');
+                  console.log('KJV data fetched:', kjvText);
+                } else {
+                  throw new Error('해당 구절을 찾을 수 없습니다.');
+                }
               } catch (kjvError) {
-                console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError);
+                console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError.message);
+                kjvText = '영어 구절을 불러오지 못했습니다: ' + kjvError.message;
               }
 
               // 한글(개역개정) 구절 가져오기 - ko_rev.json에서 필터링
@@ -415,10 +424,13 @@
               try {
                 if (!koreanData) throw new Error('한글 성경 데이터가 로드되지 않았습니다.');
                 var bookName = bookMapReverse[book] || book;
+                console.log('Looking for book:', bookName);
                 var bookData = koreanData.find(function(b) { return b.name === bookName; });
                 if (bookData) {
+                  console.log('Book found:', bookData.name);
                   var chapterData = bookData.chapters[parseInt(chapter) - 1];
                   if (chapterData) {
+                    console.log('Chapter found:', chapter);
                     var verses = [];
                     for (var v = startVerse; v <= (endVerse === Infinity ? chapterData.length : endVerse); v++) {
                       var verseText = chapterData[v - 1];
@@ -436,11 +448,11 @@
                     throw new Error('해당 장을 찾을 수 없습니다.');
                   }
                 } else {
-                  throw new Error('해당 책을 찾을 수 없습니다.');
+                  throw new Error('해당 책을 찾을 수 없습니다: ' + bookName);
                 }
               } catch (krvError) {
-                console.warn('한글 구절 데이터를 가져오지 못했습니다:', krvError);
-                krvText = '한글 구절을 불러오지 못했습니다.';
+                console.warn('한글 구절 데이터를 가져오지 못했습니다:', krvError.message);
+                krvText = '한글 구절을 불러오지 못했습니다: ' + krvError.message;
               }
 
               results.push({ query: query, kjvText: kjvText, krvText: krvText });
@@ -448,7 +460,7 @@
             setSearchResults(results);
             console.log('Search results:', results);
           } catch (error) {
-            console.error('Error fetching verses:', error);
+            console.error('Error fetching verses:', error.message);
             setError('구절을 불러오지 못했습니다: ' + error.message);
           } finally {
             setLoading(false);
