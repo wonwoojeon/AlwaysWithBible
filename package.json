@@ -1,0 +1,17 @@
+{
+  "name": "alwayswithbible",
+  "version": "1.0.0",
+  "description": "Bible Infinite Scroll App",
+  "main": "index.js",
+  "scripts": {
+    "build": "babel index.jsx --presets @babel/preset-react --out-file index.js"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.24.7",
+    "@babel/preset-react": "^7.24.7"
+  }
+}
