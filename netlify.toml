@@ -1,0 +1,13 @@
+[[redirects]]
+  from = "/api/getbible/*"
+  to = "https://query.getbible.net/:splat"
+  status = 200
+  force = true
+  headers = {Access-Control-Allow-Origin = "*"}
+
+[[redirects]]
+  from = "/api/koreanbible/*"
+  to = "https://raw.githubusercontent.com/aromkimm/bible/main/korean/:splat"
+  status = 200
+  force = true
+  headers = {Access-Control-Allow-Origin = "*"}
