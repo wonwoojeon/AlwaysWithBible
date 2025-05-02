@@ -18,10 +18,22 @@
       margin: 0 auto;
       padding: 16px;
     }
+    .title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
     .title {
       font-size: 1.5rem;
       font-weight: bold;
       margin-bottom: 16px;
+    }
+    .toggle-button {
+      background: none;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      font-size: 1rem;
     }
     .input {
       background-color: #1f2937;
@@ -42,16 +54,38 @@
     .button:hover {
       background-color: #1d4ed8;
     }
+    .sound-button {
+      background-color: #10b981;
+      color: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+    .sound-button:hover {
+      background-color: #059669;
+    }
     .selected-verses {
       margin-top: 16px;
       padding: 8px;
       background-color: #1f2937;
       border-radius: 4px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .selected-verses-container {
+      display: flex;
+      animation: slide linear infinite;
+    }
+    @keyframes slide {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
     }
     .selected-verse-item {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      padding: 4px 0;
+      padding: 4px 8px;
+      margin-right: 16px;
     }
     .delete-button {
       background-color: #ef4444;
@@ -133,12 +167,18 @@
         var speechRateState = useState(1);
         var speechRate = speechRateState[0];
         var setSpeechRate = speechRateState[1];
-        var fontSizeState = useState(1); // 글자 크기 (rem 단위, 기본값 1rem)
+        var fontSizeState = useState(1);
         var fontSize = fontSizeState[0];
         var setFontSize = fontSizeState[1];
-        var containerWidthState = useState(672); // 가로 너비 (px 단위, 기본값 672px)
+        var containerWidthState = useState(672);
         var containerWidth = containerWidthState[0];
         var setContainerWidth = containerWidthState[1];
+        var isCollapsedState = useState(false);
+        var isCollapsed = isCollapsedState[0];
+        var setIsCollapsed = isCollapsedState[1];
+        var isSoundOnState = useState(true);
+        var isSoundOn = isSoundOnState[0];
+        var setIsSoundOn = isSoundOnState[1];
         var scrollRef = useRef(null);
         var scrollPosState = useState(0);
         var scrollPos = scrollPosState[0];
@@ -221,6 +261,21 @@
           console.log('Speech rate updated:', newSpeechRate);
         }, [scrollSpeed]);
 
+        // 선택한 구절 슬라이딩 애니메이션 속도 조절
+        var animationDuration = verses.length > 0 ? 10 + verses.length * 2 : 10; // 구절 개수에 따라 속도 조절
+
+        // 음성 및 음악 켜기/끄기
+        var toggleSound = function() {
+          if (isSoundOn) {
+            window.speechSynthesis.cancel(); // 음성 재생 중지
+            document.getElementById('bgm').pause(); // 음악 일시정지
+          } else {
+            document.getElementById('bgm').play(); // 음악 재생
+            // 음성은 addVerses에서 다시 재생됨
+          }
+          setIsSoundOn(!isSoundOn);
+        };
+
         // Delete verse from the list
         var deleteVerse = function(index) {
           console.log('Deleting verse at index:', index);
@@ -252,7 +307,7 @@
               '역대상': '1 Chronicles',
               '역대하': '2 Chronicles',
               '에스라': 'Ezra',
-              '느헤미야': 'Nehemiah',
+              '느헤미야': "Nehemiah",
               '에스더': 'Esther',
               '욥기': 'Job',
               '시편': 'Psalms',
@@ -331,7 +386,7 @@
                 startVerse = 1;
                 endVerse = Infinity; // 장 전체를 표시하기 위해
               }
-              var formattedQuery = book + ' ' + chapter + (chapterVerse.length > 1 ? ':' + startVerse + (endVerse !== startVerse ? '-' + endVerse : '') : '');
+              var formattedQuery = book + ' ' + chapter;
 
               // 영어(KJV) 구절 가져오기 - GetBible API (프록시 사용)
               var kjvText = '영어 구절을 불러오지 못했습니다.';
@@ -344,7 +399,12 @@
                 var kjvData = await kjvResponse.json();
                 if (kjvData.error) throw new Error(kjvData.error);
                 var kjvKey = Object.keys(kjvData)[0];
-                kjvText = kjvData[kjvKey].verses.map(function(v) { return v.verse + ': ' + v.text; }).join(' ');
+                kjvText = kjvData[kjvKey].verses.map(function(v) { 
+                  if (endVerse === Infinity || (v.verse >= startVerse && v.verse <= endVerse)) {
+                    return v.verse + ': ' + v.text;
+                  }
+                  return null;
+                }).filter(Boolean).join(' ');
                 console.log('KJV data fetched:', kjvText);
               } catch (kjvError) {
                 console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError);
@@ -401,91 +461,118 @@
           setVerses(verses.concat([verse]));
           setSearchResults([]);
           setInput('');
-          var utterance = new SpeechSynthesisUtterance(verse.kjvText);
-          utterance.lang = 'en-US';
-          utterance.rate = speechRate;
-          window.speechSynthesis.speak(utterance);
+          if (isSoundOn) {
+            var utterance = new SpeechSynthesisUtterance(verse.kjvText);
+            utterance.lang = 'en-US';
+            utterance.rate = speechRate;
+            window.speechSynthesis.speak(utterance);
 
-          // 한글 음성 재생
-          var krUtterance = new SpeechSynthesisUtterance(verse.krvText);
-          krUtterance.lang = 'ko-KR';
-          krUtterance.rate = speechRate;
-          window.speechSynthesis.speak(krUtterance);
+            // 한글 음성 재생
+            var krUtterance = new SpeechSynthesisUtterance(verse.krvText);
+            krUtterance.lang = 'ko-KR';
+            krUtterance.rate = speechRate;
+            window.speechSynthesis.speak(krUtterance);
+          }
         };
 
         return (
           <div className="container" style={{ maxWidth: containerWidth + 'px' }}>
-            <h1 className="title">Bible Infinite Scroll</h1>
-            <div className="mb-4">
-              <input
-                type="text"
-                value={input}
-                onChange={function(e) { setInput(e.target.value); }}
-                placeholder="예: 창세기 1:1~5, 시편 23"
-                className="input"
-              />
+            <div className="title-bar">
+              <h1 className="title">Bible Infinite Scroll</h1>
               <button
-                onClick={searchVerses}
-                className="button"
+                onClick={function() { setIsCollapsed(!isCollapsed); }}
+                className="toggle-button"
               >
-                검색
+                {isCollapsed ? '▼' : '▲'}
               </button>
-              {verses.length > 0 && (
-                <div className="selected-verses">
-                  <h3 className="subtitle">선택한 구절</h3>
-                  {verses.map(function(verse, idx) {
-                    return (
-                      <div key={idx} className="selected-verse-item">
-                        <span>{verse.query}</span>
-                        <button
-                          onClick={function() { deleteVerse(idx); }}
-                          className="delete-button"
-                        >
-                          X
-                        </button>
+            </div>
+            {!isCollapsed && (
+              <div>
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={function(e) { setInput(e.target.value); }}
+                    placeholder="예: 창세기 1:1~5, 시편 23"
+                    className="input"
+                  />
+                  <button
+                    onClick={searchVerses}
+                    className="button"
+                  >
+                    검색
+                  </button>
+                  {verses.length > 0 && (
+                    <div className="selected-verses">
+                      <div
+                        className="selected-verses-container"
+                        style={{ animationDuration: animationDuration + 's' }}
+                      >
+                        {verses.concat(verses).map(function(verse, idx) {
+                          return (
+                            <div key={idx} className="selected-verse-item">
+                              <span>{verse.query}</span>
+                              <button
+                                onClick={function(e) {
+                                  e.stopPropagation();
+                                  deleteVerse(idx % verses.length);
+                                }}
+                                className="delete-button"
+                              >
+                                X
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <div className="slider-container">
-              <label className="slider-label">스크롤 속도: {scrollSpeed.toFixed(1)}</label>
-              <input
-                type="range"
-                min="0.1"
-                max="2"
-                step="0.1"
-                value={scrollSpeed}
-                onChange={function(e) { setScrollSpeed(parseFloat(e.target.value)); }}
-                className="slider"
-              />
-              <p>음성 재생 속도: {speechRate.toFixed(1)}</p>
-            </div>
-            <div className="slider-container">
-              <label className="slider-label">글자 크기: {fontSize.toFixed(1)}rem</label>
-              <input
-                type="range"
-                min="0.8"
-                max="2"
-                step="0.1"
-                value={fontSize}
-                onChange={function(e) { setFontSize(parseFloat(e.target.value)); }}
-                className="slider"
-              />
-            </div>
-            <div className="slider-container">
-              <label className="slider-label">본문 너비: {containerWidth}px</label>
-              <input
-                type="range"
-                min="400"
-                max="1000"
-                step="10"
-                value={containerWidth}
-                onChange={function(e) { setContainerWidth(parseInt(e.target.value)); }}
-                className="slider"
-              />
-            </div>
+                <div className="slider-container">
+                  <label className="slider-label">스크롤 속도: {scrollSpeed.toFixed(1)}</label>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="2"
+                    step="0.1"
+                    value={scrollSpeed}
+                    onChange={function(e) { setScrollSpeed(parseFloat(e.target.value)); }}
+                    className="slider"
+                  />
+                  <p>음성 재생 속도: {speechRate.toFixed(1)}</p>
+                </div>
+                <div className="slider-container">
+                  <label className="slider-label">글자 크기: {fontSize.toFixed(1)}rem</label>
+                  <input
+                    type="range"
+                    min="0.8"
+                    max="2"
+                    step="0.1"
+                    value={fontSize}
+                    onChange={function(e) { setFontSize(parseFloat(e.target.value)); }}
+                    className="slider"
+                  />
+                </div>
+                <div className="slider-container">
+                  <label className="slider-label">본문 너비: {containerWidth}px</label>
+                  <input
+                    type="range"
+                    min="400"
+                    max="1000"
+                    step="10"
+                    value={containerWidth}
+                    onChange={function(e) { setContainerWidth(parseInt(e.target.value)); }}
+                    className="slider"
+                  />
+                </div>
+                <button
+                  onClick={toggleSound}
+                  className="sound-button"
+                >
+                  {isSoundOn ? '🔊 소리 끄기' : '🔇 소리 켜기'}
+                </button>
+              </div>
+            )}
             {loading && <p className="loading">검색 중...</p>}
             {error && <div className="error">{error}</div>}
             {searchResults.length > 0 && (
