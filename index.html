@@ -116,7 +116,6 @@
       border-bottom: 1px solid #374151;
     }
     .scroll-area {
-      height: 70vh;
       overflow: hidden;
     }
     .slider-container {
@@ -460,11 +459,11 @@
           }
         };
 
-        var addVerses = function(verse) {
+        var addVerses = function(verse, index) {
           console.log('Adding verse to scroll list:', verse);
           setVerses(verses.concat([verse]));
-          setSearchResults([]);
-          setInput('');
+          // 체크한 구절을 검색 결과에서 제거
+          setSearchResults(searchResults.filter(function(_, i) { return i !== index; }));
           if (isSoundOn) {
             var utterance = new SpeechSynthesisUtterance(verse.kjvText);
             utterance.lang = 'en-US';
@@ -586,7 +585,7 @@
                     <div key={idx} class="verse">
                       <input
                         type="checkbox"
-                        onChange={function() { addVerses(result); }}
+                        onChange={function() { addVerses(result, idx); }}
                       />
                       <span class="ml-2">{result.query}: {result.kjvText} (KJV)</span>
                       <p class="ml-6">{result.krvText} (개역개정)</p>
@@ -598,6 +597,9 @@
             <div
               ref={scrollRef}
               class="scroll-area"
+              style={{
+                height: isCollapsed ? 'calc(100vh - 60px)' : '70vh'
+              }}
             >
               {verses.length > 0 ? (
                 verses.concat(verses).map(function(verse, idx) {
