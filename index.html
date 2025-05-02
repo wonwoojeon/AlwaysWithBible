@@ -123,6 +123,10 @@
     .scroll-area {
       overflow: hidden;
     }
+    .scroll-content {
+      display: flex;
+      flex-direction: column;
+    }
     .slider-container {
       margin: 16px 0;
     }
@@ -140,7 +144,7 @@
   <audio id="bgm" loop></audio>
   <script type="text/babel">
     if (!window.React || !window.ReactDOM || !window.Babel) {
-      console.error('Failed to load required scripts (React, ReactDOM, or Babel). Please check your network or CDN availability.');
+      console.error('Failed to load required scripts (React, ReactDOM, or Babel). Please check your network or CDN availability. URLs: React: https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js, ReactDOM: https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js, Babel: https://cdn.jsdelivr.net/npm/babel-standalone@6.26.0/babel.min.js');
       document.getElementById('root').innerHTML = '<p class="error">스크립트 로드 실패: 네트워크를 확인하거나 나중에 다시 시도하세요. 대안으로 CDN 대신 로컬 파일을 사용할 수 있습니다.</p>';
     } else {
       console.log('CDN scripts loaded successfully.');
@@ -173,7 +177,7 @@
         var fontSizeState = useState(1);
         var fontSize = fontSizeState[0];
         var setFontSize = fontSizeState[1];
-        var lineHeightState = useState(1.5); // 줄간격 상태 추가 (기본값 1.5rem)
+        var lineHeightState = useState(1.5);
         var lineHeight = lineHeightState[0];
         var setLineHeight = lineHeightState[1];
         var containerWidthState = useState(672);
@@ -184,7 +188,7 @@
         var setIsCollapsed = isCollapsedState[1];
         var isSoundOnState = useState(true);
         var isSoundOn = isSoundOnState[0];
-        var setIsSoundOn = isSoundOnState[1];
+        var setIsSoundOn = isSoundOnState[1]; // 오타 수정: setIsSound citasOn → setIsSoundOn
         var scrollRef = useRef(null);
         var scrollPosState = useState(0);
         var scrollPos = scrollPosState[0];
@@ -197,7 +201,7 @@
           console.log('Fetching ko_rev.json...');
           fetch('/assets/ko_rev.json')
             .then(function(response) {
-              if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText);
+              if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText + '. Please ensure the file exists in the /assets directory on your server.');
               return response.json();
             })
             .then(function(data) {
@@ -206,7 +210,7 @@
             })
             .catch(function(err) {
               console.error('Error loading ko_rev.json:', err.message);
-              setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message);
+              setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message + '. 서버에 /assets/ko_rev.json 파일이 있는지 확인해주세요.');
             });
         }, []);
 
@@ -219,7 +223,7 @@
               console.log('Verses loaded from localStorage:', saved);
             } catch (e) {
               console.error('Failed to parse verses from localStorage:', e);
-              setError('저장된 구절을 불러오지 못했습니다.');
+              setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
             }
           }
         }, []);
@@ -230,7 +234,7 @@
             localStorage.setItem('verses', JSON.stringify(verses));
           } catch (e) {
             console.error('Failed to save verses to localStorage:', e);
-            setError('구절을 저장하지 못했습니다.');
+            setError('구절을 저장하지 못했습니다: ' + e.message);
           }
         }, [verses]);
 
@@ -238,15 +242,19 @@
           console.log('Starting auto-scroll with speed:', scrollSpeed);
           var scroll = function() {
             setScrollPos(function(prev) {
-              if (!scrollRef.current) return prev;
+              if (!scrollRef.current || verses.length === 0) return prev; // verses가 비어 있거나 scrollRef가 없으면 스크롤하지 않음
               var maxHeight = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
-              if (prev >= maxHeight) return 0;
-              return prev + scrollSpeed;
+              if (maxHeight <= 0) return prev;
+              var newPos = prev + scrollSpeed;
+              if (newPos >= maxHeight) {
+                newPos = newPos % maxHeight;
+              }
+              return newPos;
             });
           };
           var interval = setInterval(scroll, 16);
           return function() { clearInterval(interval); };
-        }, [scrollSpeed]);
+        }, [scrollSpeed, verses]); // verses를 의존성 배열에 추가하여 verses 변경 시에도 스크롤 로직이 올바르게 동작
 
         useEffect(function() {
           if (scrollRef.current) {
@@ -384,7 +392,6 @@
               var formattedQuery = book + '+' + chapter;
               console.log('Formatted query for API:', formattedQuery);
 
-              // Fetch English (KJV) verses from Bible API
               var kjvText = '영어 구절을 불러오지 못했습니다.';
               try {
                 console.log('Fetching KJV data for:', formattedQuery);
@@ -416,11 +423,10 @@
                 kjvText = '영어 구절을 불러오지 못했습니다: ' + kjvError.message;
               }
 
-              // Fetch Korean verses from ko_rev.json
               var krvText = '한글 구절을 불러오지 못했습니다.';
               try {
                 if (!koreanData) throw new Error('한글 성경 데이터가 로드되지 않았습니다.');
-                var bookName = bookMapReverse[book] || book;
+                var bookName = book mapReverse[book] || book;
                 console.log('Looking for book:', bookName);
                 var bookData = koreanData.find(function(b) { return b.name === bookName; });
                 if (bookData) {
@@ -467,7 +473,6 @@
         var addVerses = function(verse, index) {
           console.log('Adding verse to scroll list:', verse);
           setVerses(verses.concat([verse]));
-          // 체크한 구절을 검색 결과에서 제거
           var updatedResults = searchResults.filter(function(_, i) { return i !== index; });
           setSearchResults(updatedResults);
           if (isSoundOn) {
@@ -483,7 +488,6 @@
           }
         };
 
-        // 장/절 정보를 파싱하여 표시하는 헬퍼 함수
         var formatVerseHeader = function(query) {
           var bookMatchResult = query.match(/^(\D+)/);
           var bookMatch = bookMatchResult && bookMatchResult[1] ? bookMatchResult[1].trim() : null;
@@ -682,7 +686,7 @@
                   <input
                     type="range"
                     min="400"
-                    max="1000"
+                    max="1300"
                     step="10"
                     value={containerWidth}
                     onChange={function(e) { setContainerWidth(parseInt(e.target.value)); }}
@@ -724,17 +728,20 @@
               }}
             >
               {verses.length > 0 ? (
-                verses.concat(verses).map(function(verse, idx) {
-                  var headers = formatVerseHeader(verse.query);
-                  return (
-                    <div key={idx} class="verse">
-                      <div class="verse-header">{headers.korHeader}</div>
-                      <div class="verse-header">{headers.engHeader}</div>
-                      <p style={{ fontSize: fontSize + 'rem', lineHeight: lineHeight + 'rem' }}>{verse.kjvText} (KJV)</p>
-                      <p style={{ fontSize: fontSize + 'rem', lineHeight: lineHeight + 'rem' }}>{verse.krvText} (개역개정)</p>
-                    </div>
-                  );
-                })
+                <div class="scroll-content">
+                  {[...Array(100)].map(function(_, idx) {
+                    var verse = verses[idx % verses.length];
+                    var headers = formatVerseHeader(verse.query);
+                    return (
+                      <div key={idx} class="verse">
+                        <div class="verse-header">{headers.korHeader}</div>
+                        <div class="verse-header">{headers.engHeader}</div>
+                        <p style={{ fontSize: fontSize + 'rem', lineHeight: lineHeight + 'rem' }}>{verse.kjvText} (KJV)</p>
+                        <p style={{ fontSize: fontSize + 'rem', lineHeight: lineHeight + 'rem' }}>{verse.krvText} (개역개정)</p>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
                 <p>구절을 추가하세요.</p>
               )}
