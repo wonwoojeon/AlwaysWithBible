@@ -395,20 +395,29 @@
                 console.log('Fetching KJV data for:', formattedQuery);
                 var url = 'https://bible-api.com/' + encodeURIComponent(formattedQuery) + '?translation=kjv';
                 if (endVerse !== Infinity) {
-                  url += `:${startVerse}-${endVerse}`;
+                  if (startVerse === endVerse) {
+                    url += `:${startVerse}`; // 단일 절 검색 (예: Psalms+2:3)
+                  } else {
+                    url += `:${startVerse}-${endVerse}`; // 범위 절 검색 (예: Psalms+2:3-4)
+                  }
                 }
+                console.log('KJV API URL:', url);
                 var kjvResponse = await fetch(url);
                 if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status + ' ' + kjvResponse.statusText);
                 var kjvData = await kjvResponse.json();
                 console.log('KJV API response:', kjvData);
                 if (kjvData.error) throw new Error(kjvData.error);
-                var versesArray = kjvData.verses;
                 var verses = [];
-                for (var v = 0; v < versesArray.length; v++) {
-                  var verseData = versesArray[v];
-                  if (verseData && (endVerse === Infinity || (verseData.verse >= startVerse && verseData.verse <= endVerse))) {
-                    verses.push(verseData.verse + ': ' + verseData.text.trim());
-                  }
+                if (endVerse === Infinity) {
+                  // 장 전체 검색
+                  verses = kjvData.verses.map(function(verseData) {
+                    return verseData.verse + ': ' + verseData.text.trim();
+                  });
+                } else {
+                  // 특정 절 검색
+                  verses = kjvData.verses.map(function(verseData) {
+                    return verseData.verse + ': ' + verseData.text.trim();
+                  });
                 }
                 if (verses.length > 0) {
                   kjvText = verses.join(' ');
@@ -588,19 +597,19 @@
               </div>
             )}
             {loading && <p className="loading">검색 중...</p>}
-            {error && <div className="error">{error}</div>}
+            {error && <div class="error">{error}</div>}
             {searchResults.length > 0 && (
-              <div className="mb-4">
-                <h2 className="subtitle">검색 결과</h2>
+              <div class="mb-4">
+                <h2 class="subtitle">검색 결과</h2>
                 {searchResults.map(function(result, idx) {
                   return (
-                    <div key={idx} className="verse">
+                    <div key={idx} class="verse">
                       <input
                         type="checkbox"
                         onChange={function() { addVerses(result); }}
                       />
-                      <span className="ml-2">{result.query}: {result.kjvText} (KJV)</span>
-                      <p className="ml-6">{result.krvText} (개역개정)</p>
+                      <span class="ml-2">{result.query}: {result.kjvText} (KJV)</span>
+                      <p class="ml-6">{result.krvText} (개역개정)</p>
                     </div>
                   );
                 })}
@@ -608,12 +617,12 @@
             )}
             <div
               ref={scrollRef}
-              className="scroll-area"
+              class="scroll-area"
             >
               {verses.length > 0 ? (
                 verses.concat(verses).map(function(verse, idx) {
                   return (
-                    <div key={idx} className="py-4">
+                    <div key={idx} class="py-4">
                       <p style={{ fontSize: fontSize + 'rem' }}>{verse.kjvText} (KJV)</p>
                       <p style={{ fontSize: fontSize + 'rem' }}>{verse.krvText} (개역개정)</p>
                     </div>
