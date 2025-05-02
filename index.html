@@ -15,7 +15,6 @@
       color: #fff;
     }
     .container {
-      max-width: 672px;
       margin: 0 auto;
       padding: 16px;
     }
@@ -42,6 +41,29 @@
     }
     .button:hover {
       background-color: #1d4ed8;
+    }
+    .selected-verses {
+      margin-top: 16px;
+      padding: 8px;
+      background-color: #1f2937;
+      border-radius: 4px;
+    }
+    .selected-verse-item {
+      display: flex;
+      align-items: center;
+      padding: 4px 0;
+    }
+    .delete-button {
+      background-color: #ef4444;
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+    .delete-button:hover {
+      background-color: #dc2626;
     }
     .error {
       color: #ef4444;
@@ -111,6 +133,12 @@
         var speechRateState = useState(1);
         var speechRate = speechRateState[0];
         var setSpeechRate = speechRateState[1];
+        var fontSizeState = useState(1); // 글자 크기 (rem 단위, 기본값 1rem)
+        var fontSize = fontSizeState[0];
+        var setFontSize = fontSizeState[1];
+        var containerWidthState = useState(672); // 가로 너비 (px 단위, 기본값 672px)
+        var containerWidth = containerWidthState[0];
+        var setContainerWidth = containerWidthState[1];
         var scrollRef = useRef(null);
         var scrollPosState = useState(0);
         var scrollPos = scrollPosState[0];
@@ -192,6 +220,13 @@
           setSpeechRate(Math.min(Math.max(newSpeechRate, 0.5), 2));
           console.log('Speech rate updated:', newSpeechRate);
         }, [scrollSpeed]);
+
+        // Delete verse from the list
+        var deleteVerse = function(index) {
+          console.log('Deleting verse at index:', index);
+          var updatedVerses = verses.filter(function(_, i) { return i !== index; });
+          setVerses(updatedVerses);
+        };
 
         // Search verses using GetBible (KJV) and local ko_rev.json
         var searchVerses = async function() {
@@ -280,16 +315,23 @@
               var bookMatchResult = query.match(/^(\D+)/);
               var bookMatch = bookMatchResult && bookMatchResult[1] ? bookMatchResult[1].trim() : null;
               var book = bookMap[bookMatch] || bookMatch;
-              var verseMatchResult = query.match(/(\d+:\d+(~\d+)?)/);
+              var verseMatchResult = query.match(/(\d+(?::\d+(?:~\d+)?)?)/);
               var verseMatch = verseMatchResult && verseMatchResult[0] ? verseMatchResult[0].replace('~', '-') : null;
               if (!book || !verseMatch) {
-                throw new Error('잘못된 구절 형식입니다. 예: 창세기 1:1~5');
+                throw new Error('잘못된 구절 형식입니다. 예: 창세기 1:1~5 또는 창세기 1');
               }
-              var formattedQuery = book + ' ' + verseMatch;
-              var chapter = verseMatch.split('-')[0].split(':')[0];
-              var verseRange = verseMatch.split('-');
-              var startVerse = parseInt(verseRange[0].split(':')[1]);
-              var endVerse = verseRange[1] ? parseInt(verseRange[1]) : startVerse;
+              var chapterVerse = verseMatch.split(':');
+              var chapter = chapterVerse[0];
+              var startVerse, endVerse;
+              if (chapterVerse.length > 1) {
+                var verseRange = chapterVerse[1].split('-');
+                startVerse = parseInt(verseRange[0]);
+                endVerse = verseRange[1] ? parseInt(verseRange[1]) : startVerse;
+              } else {
+                startVerse = 1;
+                endVerse = Infinity; // 장 전체를 표시하기 위해
+              }
+              var formattedQuery = book + ' ' + chapter + (chapterVerse.length > 1 ? ':' + startVerse + (endVerse !== startVerse ? '-' + endVerse : '') : '');
 
               // 영어(KJV) 구절 가져오기 - GetBible API (프록시 사용)
               var kjvText = '영어 구절을 불러오지 못했습니다.';
@@ -318,7 +360,7 @@
                   var chapterData = bookData.chapters[parseInt(chapter) - 1];
                   if (chapterData) {
                     var verses = [];
-                    for (var v = startVerse; v <= endVerse; v++) {
+                    for (var v = startVerse; v <= (endVerse === Infinity ? chapterData.length : endVerse); v++) {
                       var verseText = chapterData[v - 1];
                       if (verseText) {
                         verses.push(v + ': ' + verseText);
@@ -372,7 +414,7 @@
         };
 
         return (
-          <div className="container">
+          <div className="container" style={{ maxWidth: containerWidth + 'px' }}>
             <h1 className="title">Bible Infinite Scroll</h1>
             <div className="mb-4">
               <input
@@ -388,6 +430,24 @@
               >
                 검색
               </button>
+              {verses.length > 0 && (
+                <div className="selected-verses">
+                  <h3 className="subtitle">선택한 구절</h3>
+                  {verses.map(function(verse, idx) {
+                    return (
+                      <div key={idx} className="selected-verse-item">
+                        <span>{verse.query}</span>
+                        <button
+                          onClick={function() { deleteVerse(idx); }}
+                          className="delete-button"
+                        >
+                          X
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="slider-container">
               <label className="slider-label">스크롤 속도: {scrollSpeed.toFixed(1)}</label>
@@ -401,6 +461,30 @@
                 className="slider"
               />
               <p>음성 재생 속도: {speechRate.toFixed(1)}</p>
+            </div>
+            <div className="slider-container">
+              <label className="slider-label">글자 크기: {fontSize.toFixed(1)}rem</label>
+              <input
+                type="range"
+                min="0.8"
+                max="2"
+                step="0.1"
+                value={fontSize}
+                onChange={function(e) { setFontSize(parseFloat(e.target.value)); }}
+                className="slider"
+              />
+            </div>
+            <div className="slider-container">
+              <label className="slider-label">본문 너비: {containerWidth}px</label>
+              <input
+                type="range"
+                min="400"
+                max="1000"
+                step="10"
+                value={containerWidth}
+                onChange={function(e) { setContainerWidth(parseInt(e.target.value)); }}
+                className="slider"
+              />
             </div>
             {loading && <p className="loading">검색 중...</p>}
             {error && <div className="error">{error}</div>}
@@ -429,8 +513,8 @@
                 verses.concat(verses).map(function(verse, idx) {
                   return (
                     <div key={idx} className="py-4">
-                      <p className="text-lg">{verse.kjvText} (KJV)</p>
-                      <p className="text-lg">{verse.krvText} (개역개정)</p>
+                      <p style={{ fontSize: fontSize + 'rem' }}>{verse.kjvText} (KJV)</p>
+                      <p style={{ fontSize: fontSize + 'rem' }}>{verse.krvText} (개역개정)</p>
                     </div>
                   );
                 })
