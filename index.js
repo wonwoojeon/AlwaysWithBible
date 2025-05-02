@@ -26,7 +26,7 @@ var App = function () {
   var fontSizeState = useState(1);
   var fontSize = fontSizeState[0];
   var setFontSize = fontSizeState[1];
-  var lineHeightState = useState(1.5);
+  var lineHeightState = useState(fontSize * 1.2);
   var lineHeight = lineHeightState[0];
   var setLineHeight = lineHeightState[1];
   var containerWidthState = useState(672);
@@ -45,6 +45,9 @@ var App = function () {
   var koreanDataState = useState(null);
   var koreanData = koreanDataState[0];
   var setKoreanData = koreanDataState[1];
+  useEffect(function () {
+    setLineHeight(fontSize * 1.2);
+  }, [fontSize]);
   useEffect(function () {
     console.log('Fetching ko_rev.json...');
     fetch('/assets/ko_rev.json').then(function (response) {
@@ -434,7 +437,7 @@ var App = function () {
     className: "title-bar"
   }, /*#__PURE__*/React.createElement("h1", {
     className: "title"
-  }, "Bible Infinite Scroll"), /*#__PURE__*/React.createElement("button", {
+  }, "J2W 2027 Bible Infinite Scroll"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setIsCollapsed(!isCollapsed);
     },
@@ -491,7 +494,7 @@ var App = function () {
   }, "\uAE00\uC790 \uD06C\uAE30: ", fontSize.toFixed(1), "rem"), /*#__PURE__*/React.createElement("input", {
     type: "range",
     min: "0.8",
-    max: "2",
+    max: "4",
     step: "0.1",
     value: fontSize,
     onChange: function (e) {
@@ -505,7 +508,7 @@ var App = function () {
   }, "\uC904\uAC04\uACA9: ", lineHeight.toFixed(1), "rem"), /*#__PURE__*/React.createElement("input", {
     type: "range",
     min: "1.2",
-    max: "2.0",
+    max: "4.0",
     step: "0.1",
     value: lineHeight,
     onChange: function (e) {
