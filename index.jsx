@@ -689,18 +689,18 @@ var App = function() {
     <div className="container" style={{ maxWidth: containerWidth + 'px' }}>
       <div className="title-bar">
         <h1 className="title">j2w_2027 Bible Infinite Scroll</h1>
-        <div>
+        <div className="button-group">
+          <button
+            onClick={function() { setShowAuthPopup(true); }}
+            className="user-icon"
+          >
+            😊
+          </button>
           <button
             onClick={function() { setIsCollapsed(!isCollapsed); }}
             className="toggle-button"
           >
             {isCollapsed ? '▼' : '▲'}
-          </button>
-          <button
-            onClick={function() { setShowAuthPopup(true); }}
-            className="user-icon"
-          >
-            👤
           </button>
         </div>
       </div>
