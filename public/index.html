@@ -6,327 +6,329 @@
     return cell !== '' && cell != null;
   }
   function loadFileData(filename) {
-  if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
       try {
-          var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-          var firstSheetName = workbook.SheetNames[0];
-          var worksheet = workbook.Sheets[firstSheetName];
+        var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+        var firstSheetName = workbook.SheetNames[0];
+        var worksheet = workbook.Sheets[firstSheetName];
 
-          // Convert sheet to JSON to filter blank rows
-          var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-          // Filter out blank rows (rows where all cells are empty, null, or undefined)
-          var filteredData = jsonData.filter(row => row.some(filledCell));
+        // Convert sheet to JSON to filter blank rows
+        var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+        // Filter out blank rows (rows where all cells are empty, null, or undefined)
+        var filteredData = jsonData.filter(row => row.some(filledCell));
 
-          // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-          var headerRowIndex = filteredData.findIndex((row, index) =>
-            row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-          );
-          // Fallback
-          if (headerRowIndex === -1 || headerRowIndex > 25) {
-            headerRowIndex = 0;
-          }
+        // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+        var headerRowIndex = filteredData.findIndex((row, index) =>
+          row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+        );
+        // Fallback
+        if (headerRowIndex === -1 || headerRowIndex > 25) {
+          headerRowIndex = 0;
+        }
 
-          // Convert filtered JSON back to CSV
-          var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-          csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-          return csv;
+        // Convert filtered JSON back to CSV
+        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+        csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+        return csv;
       } catch (e) {
-          console.error(e);
-          return "";
+        console.error(e);
+        return "";
       }
-  }
-  return gk_fileData[filename] || "";
+    }
+    return gk_fileData[filename] || "";
   }
 </script>
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>j2w_2027 Bible Infinite Scroll</title>
-<script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-<!-- Firebase SDK 로드 전 함수 정의 -->
-<script>
-window.firebaseLoaded = false;
-window.firestoreLoaded = false;
-window.authLoaded = false;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>j2w_2027 Bible Infinite Scroll</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Firebase SDK 로드 전 함수 정의 -->
+  <script>
+    window.firebaseLoaded = false;
+    window.firestoreLoaded = false;
+    window.authLoaded = false;
 
-function loadFirebaseFallback(scriptName) {
-console.warn('CDN load failed, attempting to load from local fallback: ' + scriptName);
-var script = document.createElement('script');
-script.src = '/lib/' + scriptName;
-script.onload = function() {
-  if (scriptName.includes('firebase-app')) window.firebaseLoaded = true;
-  if (scriptName.includes('firebase-firestore')) window.firestoreLoaded = true;
-  if (scriptName.includes('firebase-auth')) window.authLoaded = true;
-  checkFirebaseLoadStatus();
-};
-script.onerror = function() {
-  console.error('Failed to load fallback for ' + scriptName);
-  document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 로컬 폴백도 실패했습니다.</div>';
-};
-document.head.appendChild(script);
-}
+    function loadFirebaseFallback(scriptName) {
+      console.warn('CDN load failed, attempting to load from local fallback: ' + scriptName);
+      var script = document.createElement('script');
+      script.src = '/lib/' + scriptName;
+      script.onload = function() {
+        if (scriptName.includes('firebase-app')) window.firebaseLoaded = true;
+        if (scriptName.includes('firebase-firestore')) window.firestoreLoaded = true;
+        if (scriptName.includes('firebase-auth')) window.authLoaded = true;
+        checkFirebaseLoadStatus();
+      };
+      script.onerror = function() {
+        console.error('Failed to load fallback for ' + scriptName);
+        document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 로컬 폴백도 실패했습니다.</div>';
+      };
+      document.head.appendChild(script);
+    }
 
-function checkFirebaseLoadStatus() {
-if (window.firebaseLoaded && window.firestoreLoaded && window.authLoaded) {
-  initializeFirebase();
-}
-}
+    function checkFirebaseLoadStatus() {
+      if (window.firebaseLoaded && window.firestoreLoaded && window.authLoaded) {
+        initializeFirebase();
+      }
+    }
 
-function initializeFirebase() {
-if (typeof firebase === 'undefined') {
-  console.error('Firebase SDK failed to load from CDN and fallback.');
-  document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 네트워크를 확인하거나 나중에 다시 시도해주세요.</div>';
-} else {
-  var firebaseConfig = {
-    apiKey: "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o",
-    authDomain: "j2wbibleinfinitescroll.firebaseapp.com",
-    projectId: "j2wbibleinfinitescroll",
-    storageBucket: "j2wbibleinfinitescroll.firebasestorage.app",
-    messagingSenderId: "1083438447830",
-    appId: "1:1083438447830:web:2d9b2d2fecf2e3f440dd77"
-  };
-  try {
-    firebase.initializeApp(firebaseConfig);
-    console.log('Firebase initialized successfully');
-  } catch (e) {
-    console.error('Firebase initialization failed:', e);
-    document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase 초기화에 실패했습니다: ' + e.message + '</div>';
-  }
-}
-}
-</script>
-<!-- Firebase SDK 추가 (Google Firebase CDN 사용) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" onload="window.firebaseLoaded = true" onerror="window.firebaseLoaded = false; loadFirebaseFallback('firebase-app-compat-10.12.5.min.js')"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" onload="window.firestoreLoaded = true" onerror="window.firestoreLoaded = false; loadFirebaseFallback('firebase-firestore-compat-10.12.5.min.js')"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" onload="window.authLoaded = true" onerror="window.authLoaded = false; loadFirebaseFallback('firebase-auth-compat-10.12.5.min.js')"></script>
-<script>
-window.onload = function() {
-if (!window.firebaseLoaded || !window.firestoreLoaded || !window.authLoaded) {
-  console.error('One or more Firebase SDKs failed to load from CDN.');
-  document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 네트워크를 확인하거나 나중에 다시 시도해주세요.</div>';
-  return;
-}
-initializeFirebase();
-};
-</script>
-<style>
-body {
-margin: 0;
-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-background-color: #000;
-color: #fff;
-}
-.container {
-margin: 0 auto;
-padding: 16px;
-position: relative;
-}
-.title-bar {
-display: flex;
-align-items: center;
-justify-content: space-between;
-}
-.title {
-font-size: 1.5rem;
-font-weight: bold;
-margin-bottom: 16px;
-}
-.button-group {
-display: flex;
-align-items: center;
-gap: 10px; /* 버튼 간 간격 */
-}
-.toggle-button {
-background: none;
-border: none;
-color: #fff;
-cursor: pointer;
-font-size: 1rem;
-}
-.input {
-background-color: #1f2937;
-color: #fff;
-padding: 8px;
-border-radius: 4px;
-width: 100%;
-box-sizing: border-box;
-}
-.button {
-background-color: #2563eb;
-color: #fff;
-padding: 8px;
-border-radius: 4px;
-margin-top: 8px;
-cursor: pointer;
-}
-.button:hover {
-background-color: #1d4ed8;
-}
-.sound-button {
-background-color: #10b981;
-color: #fff;
-padding: 8px;
-border-radius: 4px;
-margin-top: 8px;
-cursor: pointer;
-}
-.sound-button:hover {
-background-color: #059669;
-}
-.selected-verses {
-margin-top: 16px;
-padding: 8px;
-background-color: #1f2937;
-border-radius: 4px;
-overflow: hidden;
-white-space: nowrap;
-}
-.selected-verses-container {
-display: flex;
-animation: slide linear infinite;
-}
-@keyframes slide {
-0% { transform: translateX(0); }
-100% { transform: translateX(-50%); }
-}
-.selected-verse-item {
-display: inline-flex;
-align-items: center;
-padding: 4px 8px;
-margin-right: 16px;
-}
-.delete-button {
-background-color: #ef4444;
-color: #fff;
-padding: 2px 6px;
-border-radius: 4px;
-margin-left: 8px;
-cursor: pointer;
-font-size: 0.75rem;
-}
-.delete-button:hover {
-background-color: #dc2626;
-}
-.share-button {
-background-color: #4CAF50;
-color: white;
-padding: 2px 6px;
-border-radius: 4px;
-margin-left: 8px;
-cursor: pointer;
-font-size: 0.75rem;
-}
-.share-button:hover {
-background-color: #45a049;
-}
-.error {
-color: #ef4444;
-margin-bottom: 16px;
-}
-.loading {
-color: #9ca3af;
-margin-bottom: 16px;
-}
-.subtitle {
-font-size: 1.125rem;
-font-weight: 600;
-}
-.verse {
-padding: 16px 0;
-border-bottom: 1px solid #374151;
-}
-.verse-header {
-font-size: 1rem;
-font-weight: 600;
-margin-bottom: 8px;
-}
-.scroll-area {
-overflow: hidden;
-}
-.scroll-content {
-display: flex;
-flex-direction: column;
-}
-.slider-container {
-margin: 16px 0;
-}
-.slider-label {
-display: block;
-margin-bottom: 8px;
-}
-.slider {
-width: 100%;
-}
-.ml-2 { margin-left: 8px; }
-.ml-6 { margin-left: 24px; }
-.mb-4 { margin-bottom: 16px; }
-/* 팝업 스타일 */
-.user-icon {
-background: none;
-border: none;
-font-size: 1.5rem;
-color: #fff;
-cursor: pointer;
-}
-.user-icon:hover {
-color: #ddd;
-}
-.auth-popup {
-position: fixed;
-top: 50%;
-left: 50%;
-transform: translate(-50%, -50%);
-background-color: #1f2937;
-padding: 20px;
-border-radius: 8px;
-box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-z-index: 1000;
-width: 300px;
-max-width: 90%;
-}
-.auth-popup-overlay {
-position: fixed;
-top: 0;
-left: 0;
-width: 100%;
-height: 100%;
-background-color: rgba(0, 0, 0, 0.5);
-z-index: 999;
-}
-.auth-popup-close {
-position: absolute;
-top: 10px;
-right: 10px;
-background: none;
-border: none;
-color: #fff;
-font-size: 1.2rem;
-cursor: pointer;
-}
-.auth-tabs {
-display: flex;
-justify-content: space-around;
-margin-bottom: 16px;
-}
-.auth-tab {
-background: none;
-border: none;
-color: #fff;
-padding: 8px 16px;
-cursor: pointer;
-font-size: 1rem;
-}
-.auth-tab.active {
-border-bottom: 2px solid #2563eb;
-}
-</style>
+    function initializeFirebase() {
+      if (typeof firebase === 'undefined') {
+        console.error('Firebase SDK failed to load from CDN and fallback.');
+        document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 네트워크를 확인하거나 나중에 다시 시도해주세요.</div>';
+      } else {
+        var firebaseConfig = {
+          apiKey: "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o",
+          authDomain: "j2wbibleinfinitescroll.firebaseapp.com",
+          projectId: "j2wbibleinfinitescroll",
+          storageBucket: "j2wbibleinfinitescroll.firebasestorage.app",
+          messagingSenderId: "1083438447830",
+          appId: "1:1083438447830:web:2d9b2d2fecf2e3f440dd77"
+        };
+        try {
+          firebase.initializeApp(firebaseConfig);
+          console.log('Firebase initialized successfully');
+        } catch (e) {
+          console.error('Firebase initialization failed:', e);
+          document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase 초기화에 실패했습니다: ' + e.message + '</div>';
+        }
+      }
+    }
+  </script>
+  <!-- Firebase SDK 추가 (Google Firebase CDN 사용) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" onload="window.firebaseLoaded = true" onerror="window.firebaseLoaded = false; loadFirebaseFallback('firebase-app-compat-10.12.5.min.js')"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" onload="window.firestoreLoaded = true" onerror="window.firestoreLoaded = false; loadFirebaseFallback('firebase-firestore-compat-10.12.5.min.js')"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" onload="window.authLoaded = true" onerror="window.authLoaded = false; loadFirebaseFallback('firebase-auth-compat-10.12.5.min.js')"></script>
+  <script>
+    window.onload = function() {
+      if (!window.firebaseLoaded || !window.firestoreLoaded || !window.authLoaded) {
+        console.error('One or more Firebase SDKs failed to load from CDN.');
+        document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 네트워크를 확인하거나 나중에 다시 시도해주세요.</div>';
+        return;
+      }
+      initializeFirebase();
+    };
+  </script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: #000;
+      color: #fff;
+    }
+    .container {
+      margin: 0 auto;
+      padding: 16px;
+      position: relative;
+    }
+    .title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .title {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+    .button-group {
+      display: flex;
+      align-items: center;
+      gap: 10px; /* 버튼 간 간격 */
+    }
+    .toggle-button {
+      background: none;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .input {
+      background-color: #1f2937;
+      color: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .button {
+      background-color: #2563eb;
+      color: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+    .button:hover {
+      background-color: #1d4ed8;
+    }
+    .sound-button {
+      background-color: #10b981;
+      color: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+    .sound-button:hover {
+      background-color: #059669;
+    }
+    .selected-verses {
+      margin-top: 16px;
+      padding: 8px;
+      background-color: #1f2937;
+      border-radius: 4px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .selected-verses-container {
+      display: flex;
+      animation: slide linear infinite;
+    }
+    @keyframes slide {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .selected-verse-item {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      margin-right: 16px;
+    }
+    .delete-button {
+      background-color: #ef4444;
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+    .delete-button:hover {
+      background-color: #dc2626;
+    }
+    .share-button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+    .share-button:hover {
+      background-color: #45a049;
+    }
+    .error {
+      color: #ef4444;
+      margin-bottom: 16px;
+    }
+    .loading {
+      color: #9ca3af;
+      margin-bottom: 16px;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+    .verse {
+      padding: 16px 0;
+      border-bottom: 1px solid #374151;
+    }
+    .verse-header {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .scroll-area {
+      overflow: hidden;
+    }
+    .scroll-content {
+      display: flex;
+      flex-direction: column;
+    }
+    .slider-container {
+      margin: 16px 0;
+    }
+    .slider-label {
+      display: block;
+      margin-bottom: 8px;
+    }
+    .slider {
+      width: 100%;
+    }
+    .ml-2 { margin-left: 8px; }
+    .ml-6 { margin-left: 24px; }
+    .mb-4 { margin-bottom: 16px; }
+    /* 팝업 스타일 */
+    .user-icon {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: #fff;
+      cursor: pointer;
+    }
+    .user-icon:hover {
+      color: #ddd;
+    }
+    .auth-popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #1f2937;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      width: 300px;
+      max-width: 90%;
+    }
+    .auth-popup-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+    }
+    .auth-popup-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+    .auth-tabs {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 16px;
+    }
+    .auth-tab {
+      background: none;
+      border: none;
+      color: #fff;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .auth-tab.active {
+      border-bottom: 2px solid #2563eb;
+    }
+  </style>
 </head>
 <body>
-<div id="root"></div>
-<audio id="bgm" loop></audio>
-<script src="index.js"></script>
+  <div id="root"></div>
+  <audio id="bgm" loop></audio>
+  <script src="/index.js"></script>
+  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93a009996b75453e',t:'MTc0NjI3ODIzNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>

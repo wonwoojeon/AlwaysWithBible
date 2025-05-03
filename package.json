@@ -4,12 +4,9 @@
   "description": "Bible Infinite Scroll App",
   "main": "index.js",
   "scripts": {
-    "build": "babel index.jsx --presets @babel/preset-react --out-file index.js"
+    "build": "babel index.jsx --presets @babel/preset-react --out-file public/index.js"
   },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@babel/cli": "^7.27.1",
     "@babel/core": "^7.27.1",
