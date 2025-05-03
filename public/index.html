@@ -43,6 +43,28 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script>
+    // Firebase SDK 로드 완료 후 index.js 동적 로드
+    document.addEventListener('DOMContentLoaded', function() {
+      const checkFirebaseLoaded = setInterval(function() {
+        if (typeof firebase !== 'undefined') {
+          clearInterval(checkFirebaseLoaded);
+          // index.js 동적 로드
+          const script = document.createElement('script');
+          script.src = '/index.js';
+          script.async = true;
+          document.body.appendChild(script);
+        }
+      }, 100);
+      // 5초 후에도 로드되지 않으면 오류 메시지 표시
+      setTimeout(function() {
+        if (typeof firebase === 'undefined') {
+          clearInterval(checkFirebaseLoaded);
+          console.error('Firebase SDK 로드에 실패했습니다. 네트워크 상태를 확인하거나 새로고침을 시도해주세요.');
+        }
+      }, 5000);
+    });
+  </script>
   <style>
     body {
       margin: 0;
@@ -258,7 +280,6 @@
 <body>
   <div id="root"></div>
   <audio id="bgm" loop></audio>
-  <script defer src="/index.js"></script>
   <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93a009996b75453e',t:'MTc0NjI3ODIzNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
   <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93a037800f814507',t:'MTc0NjI4MDExNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
