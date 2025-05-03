@@ -169,22 +169,27 @@ var App = function () {
 
   // BGM 파일 목록 로드
   useEffect(function () {
-    fetch('/assets/index.json').then(function (response) {
-      if (!response.ok) throw new Error('Failed to load BGM list');
-      return response.json();
-    }).then(function (data) {
-      var bgmFiles = data.bgmFiles.map(function (file) {
-        return `/assets/${file}`;
+    fetch('/assets/index.json')
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Failed to load BGM list: ' + response.status + ' ' + response.statusText);
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        var bgmFiles = data.bgmFiles.map(function (file) {
+          return `/assets/${file}`;
+        });
+        setBgmList(bgmFiles);
+        if (bgmFiles.length > 0) {
+          var randomIndex = Math.floor(Math.random() * bgmFiles.length);
+          setCurrentBgm(bgmFiles[randomIndex]);
+        }
+      })
+      .catch(function (err) {
+        console.error('Error loading BGM list:', err.message);
+        setError('BGM 목록을 불러오지 못했습니다: ' + err.message);
       });
-      setBgmList(bgmFiles);
-      if (bgmFiles.length > 0) {
-        var randomIndex = Math.floor(Math.random() * bgmFiles.length);
-        setCurrentBgm(bgmFiles[randomIndex]);
-      }
-    }).catch(function (err) {
-      console.error('Error loading BGM list:', err.message);
-      setError('BGM 목록을 불러오지 못했습니다: ' + err.message);
-    });
   }, []);
 
   // BGM 재생 로직
@@ -201,18 +206,25 @@ var App = function () {
       bgmElement.pause();
     }
   }, [isBgmOn, currentBgm, bgmList]);
+
+  // 한글 성경 데이터 로드
   useEffect(function () {
     console.log('Fetching ko_rev.json...');
-    fetch('/assets/ko_rev.json').then(function (response) {
-      if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText + '. Please ensure the file exists in the /assets directory on your server.');
-      return response.json();
-    }).then(function (data) {
-      setKoreanData(data);
-      console.log('ko_rev.json loaded:', data);
-    }).catch(function (err) {
-      console.error('Error loading ko_rev.json:', err.message);
-      setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message + '. 서버에 /assets/ko_rev.json 파일이 있는지 확인해주세요.');
-    });
+    fetch('/assets/ko_rev.json')
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText);
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        setKoreanData(data);
+        console.log('ko_rev.json loaded:', data);
+      })
+      .catch(function (err) {
+        console.error('Error loading ko_rev.json:', err.message);
+        setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message + '. 서버에 /assets/ko_rev.json 파일이 있는지 확인해주세요.');
+      });
   }, []);
 
   // 로그인 상태에 따라 구절 로드 (실시간 업데이트)
@@ -275,6 +287,8 @@ var App = function () {
       unsubscribe();
     };
   }, []);
+
+  // 자동 스크롤 로직
   useEffect(function () {
     console.log('Starting auto-scroll with speed:', scrollSpeed);
     var scroll = function () {
@@ -294,27 +308,33 @@ var App = function () {
       clearInterval(interval);
     };
   }, [scrollSpeed, verses]);
+
   useEffect(function () {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollPos;
       console.log('Scroll position updated:', scrollPos);
     }
   }, [scrollPos]);
+
   useEffect(function () {
     var newSpeechRate = 0.5 + (scrollSpeed - 0.1) * (1.5 / 1.9);
     setSpeechRate(Math.min(Math.max(newSpeechRate, 0.5), 2));
     console.log('Speech rate updated:', newSpeechRate);
   }, [scrollSpeed]);
+
   var animationDuration = verses.length > 0 ? 10 + verses.length * 2 : 10;
+
   var toggleBgm = function () {
     setIsBgmOn(!isBgmOn);
   };
+
   var toggleVoice = function () {
     if (isVoiceOn) {
       window.speechSynthesis.cancel();
     }
     setIsVoiceOn(!isVoiceOn);
   };
+
   var deleteVerse = function (index) {
     console.log('Deleting verse at index:', index);
     var updatedVerses = verses.filter(function (_, i) {
@@ -322,6 +342,7 @@ var App = function () {
     });
     setVerses(updatedVerses);
   };
+
   var signup = function () {
     if (!auth) {
       setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
@@ -345,6 +366,7 @@ var App = function () {
       setError('회원가입 실패: ' + error.message);
     });
   };
+
   var login = function () {
     if (!auth) {
       setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
@@ -364,6 +386,7 @@ var App = function () {
       setError('로그인 실패: ' + error.message);
     });
   };
+
   var logout = function () {
     if (!auth) {
       setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
@@ -378,6 +401,7 @@ var App = function () {
       setError('로그아웃 실패: ' + error.message);
     });
   };
+
   var shareVerse = function (verse) {
     if (!db) {
       setError('Firebase 데이터베이스 서비스가 초기화되지 않았습니다.');
@@ -399,9 +423,11 @@ var App = function () {
       setError('구절 공유 실패: ' + e.message);
     });
   };
+
   var addSharedVerse = function (sharedVerse) {
     setVerses(verses.concat([sharedVerse.verse]));
   };
+
   var searchVerses = async function () {
     setLoading(true);
     setError('');
@@ -513,7 +539,9 @@ var App = function () {
           var url = 'https://bible-api.com/' + encodeURIComponent(formattedQuery) + '?translation=kjv';
           console.log('KJV API URL:', url);
           var kjvResponse = await fetch(url);
-          if (!kjvResponse.ok) throw new Error(`KJV API 요청 실패: ${kjvResponse.status} ${kjvResponse.statusText}`);
+          if (!kjvResponse.ok) {
+            throw new Error(`KJV API 요청 실패: ${kjvResponse.status} ${kjvResponse.statusText}`);
+          }
           var kjvData = await kjvResponse.json();
           console.log('KJV API response:', kjvData);
           if (kjvData.error) throw new Error(kjvData.error);
@@ -585,6 +613,7 @@ var App = function () {
       setLoading(false);
     }
   };
+
   var addVerses = function (verse, index) {
     console.log('Adding verse to scroll list:', verse);
     setVerses(verses.concat([verse]));
@@ -605,6 +634,7 @@ var App = function () {
       window.speechSynthesis.speak(krUtterance);
     }
   };
+
   var formatVerseHeader = function (query) {
     var bookMatchResult = query.match(/^(\D+)/);
     var bookMatch = bookMatchResult && bookMatchResult[1] ? bookMatchResult[1].trim() : null;
@@ -702,6 +732,7 @@ var App = function () {
       engHeader
     };
   };
+
   return /*#__PURE__*/React.createElement("div", {
     className: "container",
     style: {
@@ -752,16 +783,20 @@ var App = function () {
       setAuthTab('signup');
       setError('');
     }
-  }, "\uD68C\uC6D0\uAC00\uC785")), authTab === 'login' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
+  }, "\uD68C\uC6D0\uAC00\uC785")), authTab === 'login' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", { htmlFor: "login-email" }, "이메일"), /*#__PURE__*/React.createElement("input", {
     type: "email",
+    id: "login-email",
+    name: "login-email",
     value: username,
     onChange: function (e) {
       setUsername(e.target.value);
     },
     placeholder: "\uC774\uBA54\uC77C (\uC608: user@example.com)",
     className: "input"
-  }), /*#__PURE__*/React.createElement("input", {
+  }), /*#__PURE__*/React.createElement("label", { htmlFor: "login-password" }, "비밀번호"), /*#__PURE__*/React.createElement("input", {
     type: "password",
+    id: "login-password",
+    name: "login-password",
     value: password,
     onChange: function (e) {
       setPassword(e.target.value);
@@ -771,16 +806,20 @@ var App = function () {
   }), /*#__PURE__*/React.createElement("button", {
     onClick: login,
     className: "button"
-  }, "\uB85C\uADF8\uC778")), authTab === 'signup' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
+  }, "\uB85C\uADF8\uC778")), authTab === 'signup' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", { htmlFor: "signup-email" }, "이메일"), /*#__PURE__*/React.createElement("input", {
     type: "email",
+    id: "signup-email",
+    name: "signup-email",
     value: signupUsername,
     onChange: function (e) {
       setSignupUsername(e.target.value);
     },
     placeholder: "\uC774\uBA54\uC77C (\uC608: user@example.com)",
     className: "input"
-  }), /*#__PURE__*/React.createElement("input", {
+  }), /*#__PURE__*/React.createElement("label", { htmlFor: "signup-password" }, "비밀번호"), /*#__PURE__*/React.createElement("input", {
     type: "password",
+    id: "signup-password",
+    name: "signup-password",
     value: signupPassword,
     onChange: function (e) {
       setSignupPassword(e.target.value);
@@ -792,8 +831,10 @@ var App = function () {
     className: "button"
   }, "\uD68C\uC6D0\uAC00\uC785"))))), !isCollapsed && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "mb-4"
-  }, /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("label", { htmlFor: "verse-input" }, "구절 검색"), /*#__PURE__*/React.createElement("input", {
     type: "text",
+    id: "verse-input",
+    name: "verse-input",
     value: input,
     onChange: function (e) {
       setInput(e.target.value);
@@ -830,9 +871,12 @@ var App = function () {
   })))), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "slider-label"
+    className: "slider-label",
+    htmlFor: "scroll-speed"
   }, "\uC2A4\uD06C\uB864 \uC18D\uB3C4: ", scrollSpeed.toFixed(1)), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    id: "scroll-speed",
+    name: "scroll-speed",
     min: "0.1",
     max: "2",
     step: "0.1",
@@ -844,9 +888,12 @@ var App = function () {
   }), /*#__PURE__*/React.createElement("p", null, "\uC74C\uC131 \uC7AC\uC0DD \uC18D\uB3C4: ", speechRate.toFixed(1))), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "slider-label"
+    className: "slider-label",
+    htmlFor: "font-size"
   }, "\uAE00\uC790 \uD06C\uAE30: ", fontSize.toFixed(1), "rem"), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    id: "font-size",
+    name: "font-size",
     min: "0.8",
     max: "4",
     step: "0.1",
@@ -858,9 +905,12 @@ var App = function () {
   })), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "slider-label"
+    className: "slider-label",
+    htmlFor: "line-height"
   }, "\uC904\uAC04\uACA9: ", lineHeight.toFixed(1), "rem"), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    id: "line-height",
+    name: "line-height",
     min: "1.2",
     max: "4.0",
     step: "0.1",
@@ -872,9 +922,12 @@ var App = function () {
   })), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "slider-label"
+    className: "slider-label",
+    htmlFor: "container-width"
   }, "\uBCF8\uBB38 \uB108\uBE44: ", containerWidth, "px"), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    id: "container-width",
+    name: "container-width",
     min: "400",
     max: "1300",
     step: "10",
@@ -886,9 +939,12 @@ var App = function () {
   })), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "slider-label"
+    className: "slider-label",
+    htmlFor: "speech-volume"
   }, "\uC74C\uC131 \uBCFC\uB968: ", speechVolume.toFixed(1)), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    id: "speech-volume",
+    name: "speech-volume",
     min: "0",
     max: "1",
     step: "0.1",
@@ -917,10 +973,13 @@ var App = function () {
       className: "verse"
     }, /*#__PURE__*/React.createElement("input", {
       type: "checkbox",
+      id: `verse-checkbox-${idx}`,
+      name: `verse-checkbox-${idx}`,
       onChange: function () {
         addVerses(result, idx);
       }
-    }), /*#__PURE__*/React.createElement("span", {
+    }), /*#__PURE__*/React.createElement("label", {
+      htmlFor: `verse-checkbox-${idx}`,
       className: "ml-2"
     }, result.query, ": ", result.kjvText, " (KJV)"), /*#__PURE__*/React.createElement("p", {
       className: "ml-6"
@@ -976,5 +1035,6 @@ var App = function () {
     }, verse.krvText, " (\uAC1C\uC5ED\uAC1C\uC815)"));
   })) : /*#__PURE__*/React.createElement("p", null, "\uAD6C\uC808\uC744 \uCD94\uAC00\uD558\uC138\uC694.")));
 };
+
 ReactDOM.render(/*#__PURE__*/React.createElement(App, null), document.getElementById('root'));
 console.log('App rendered successfully.');

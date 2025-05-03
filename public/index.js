@@ -169,7 +169,9 @@ var App = function () {
   // BGM 파일 목록 로드
   useEffect(function () {
     fetch('/assets/index.json').then(function (response) {
-      if (!response.ok) throw new Error('Failed to load BGM list');
+      if (!response.ok) {
+        throw new Error('Failed to load BGM list: ' + response.status + ' ' + response.statusText);
+      }
       return response.json();
     }).then(function (data) {
       var bgmFiles = data.bgmFiles.map(function (file) {
@@ -200,10 +202,14 @@ var App = function () {
       bgmElement.pause();
     }
   }, [isBgmOn, currentBgm, bgmList]);
+
+  // 한글 성경 데이터 로드
   useEffect(function () {
     console.log('Fetching ko_rev.json...');
     fetch('/assets/ko_rev.json').then(function (response) {
-      if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText + '. Please ensure the file exists in the /assets directory on your server.');
+      if (!response.ok) {
+        throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText);
+      }
       return response.json();
     }).then(function (data) {
       setKoreanData(data);
@@ -274,6 +280,8 @@ var App = function () {
       unsubscribe();
     };
   }, []);
+
+  // 자동 스크롤 로직
   useEffect(function () {
     console.log('Starting auto-scroll with speed:', scrollSpeed);
     var scroll = function () {
@@ -512,7 +520,9 @@ var App = function () {
           var url = 'https://bible-api.com/' + encodeURIComponent(formattedQuery) + '?translation=kjv';
           console.log('KJV API URL:', url);
           var kjvResponse = await fetch(url);
-          if (!kjvResponse.ok) throw new Error(`KJV API 요청 실패: ${kjvResponse.status} ${kjvResponse.statusText}`);
+          if (!kjvResponse.ok) {
+            throw new Error(`KJV API 요청 실패: ${kjvResponse.status} ${kjvResponse.statusText}`);
+          }
           var kjvData = await kjvResponse.json();
           console.log('KJV API response:', kjvData);
           if (kjvData.error) throw new Error(kjvData.error);
@@ -751,16 +761,24 @@ var App = function () {
       setAuthTab('signup');
       setError('');
     }
-  }, "\uD68C\uC6D0\uAC00\uC785")), authTab === 'login' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
+  }, "\uD68C\uC6D0\uAC00\uC785")), authTab === 'login' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "login-email"
+  }, "이메일"), /*#__PURE__*/React.createElement("input", {
     type: "email",
+    id: "login-email",
+    name: "login-email",
     value: username,
     onChange: function (e) {
       setUsername(e.target.value);
     },
     placeholder: "\uC774\uBA54\uC77C (\uC608: user@example.com)",
     className: "input"
-  }), /*#__PURE__*/React.createElement("input", {
+  }), /*#__PURE__*/React.createElement("label", {
+    htmlFor: "login-password"
+  }, "비밀번호"), /*#__PURE__*/React.createElement("input", {
     type: "password",
+    id: "login-password",
+    name: "login-password",
     value: password,
     onChange: function (e) {
       setPassword(e.target.value);
@@ -770,16 +788,24 @@ var App = function () {
   }), /*#__PURE__*/React.createElement("button", {
     onClick: login,
     className: "button"
-  }, "\uB85C\uADF8\uC778")), authTab === 'signup' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
+  }, "\uB85C\uADF8\uC778")), authTab === 'signup' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "signup-email"
+  }, "이메일"), /*#__PURE__*/React.createElement("input", {
     type: "email",
+    id: "signup-email",
+    name: "signup-email",
     value: signupUsername,
     onChange: function (e) {
       setSignupUsername(e.target.value);
     },
     placeholder: "\uC774\uBA54\uC77C (\uC608: user@example.com)",
     className: "input"
-  }), /*#__PURE__*/React.createElement("input", {
+  }), /*#__PURE__*/React.createElement("label", {
+    htmlFor: "signup-password"
+  }, "비밀번호"), /*#__PURE__*/React.createElement("input", {
     type: "password",
+    id: "signup-password",
+    name: "signup-password",
     value: signupPassword,
     onChange: function (e) {
       setSignupPassword(e.target.value);
@@ -791,8 +817,12 @@ var App = function () {
     className: "button"
   }, "\uD68C\uC6D0\uAC00\uC785"))))), !isCollapsed && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "mb-4"
-  }, /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "verse-input"
+  }, "구절 검색"), /*#__PURE__*/React.createElement("input", {
     type: "text",
+    id: "verse-input",
+    name: "verse-input",
     value: input,
     onChange: function (e) {
       setInput(e.target.value);
@@ -829,9 +859,12 @@ var App = function () {
   })))), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "slider-label"
+    className: "slider-label",
+    htmlFor: "scroll-speed"
   }, "\uC2A4\uD06C\uB864 \uC18D\uB3C4: ", scrollSpeed.toFixed(1)), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    id: "scroll-speed",
+    name: "scroll-speed",
     min: "0.1",
     max: "2",
     step: "0.1",
@@ -843,9 +876,12 @@ var App = function () {
   }), /*#__PURE__*/React.createElement("p", null, "\uC74C\uC131 \uC7AC\uC0DD \uC18D\uB3C4: ", speechRate.toFixed(1))), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "slider-label"
+    className: "slider-label",
+    htmlFor: "font-size"
   }, "\uAE00\uC790 \uD06C\uAE30: ", fontSize.toFixed(1), "rem"), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    id: "font-size",
+    name: "font-size",
     min: "0.8",
     max: "4",
     step: "0.1",
@@ -857,9 +893,12 @@ var App = function () {
   })), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "slider-label"
+    className: "slider-label",
+    htmlFor: "line-height"
   }, "\uC904\uAC04\uACA9: ", lineHeight.toFixed(1), "rem"), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    id: "line-height",
+    name: "line-height",
     min: "1.2",
     max: "4.0",
     step: "0.1",
@@ -871,9 +910,12 @@ var App = function () {
   })), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "slider-label"
+    className: "slider-label",
+    htmlFor: "container-width"
   }, "\uBCF8\uBB38 \uB108\uBE44: ", containerWidth, "px"), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    id: "container-width",
+    name: "container-width",
     min: "400",
     max: "1300",
     step: "10",
@@ -885,9 +927,12 @@ var App = function () {
   })), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
-    className: "slider-label"
+    className: "slider-label",
+    htmlFor: "speech-volume"
   }, "\uC74C\uC131 \uBCFC\uB968: ", speechVolume.toFixed(1)), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    id: "speech-volume",
+    name: "speech-volume",
     min: "0",
     max: "1",
     step: "0.1",
@@ -916,10 +961,13 @@ var App = function () {
       className: "verse"
     }, /*#__PURE__*/React.createElement("input", {
       type: "checkbox",
+      id: `verse-checkbox-${idx}`,
+      name: `verse-checkbox-${idx}`,
       onChange: function () {
         addVerses(result, idx);
       }
-    }), /*#__PURE__*/React.createElement("span", {
+    }), /*#__PURE__*/React.createElement("label", {
+      htmlFor: `verse-checkbox-${idx}`,
       className: "ml-2"
     }, result.query, ": ", result.kjvText, " (KJV)"), /*#__PURE__*/React.createElement("p", {
       className: "ml-6"
