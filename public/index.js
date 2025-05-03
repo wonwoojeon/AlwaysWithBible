@@ -105,10 +105,13 @@ var App = function () {
   var isVoiceOn = isVoiceOnState[0];
   var setIsVoiceOn = isVoiceOnState[1];
 
-  // 음성 소리 볼륨 상태
+  // 음성 및 BGM 볼륨 상태
   var speechVolumeState = useState(1.0);
   var speechVolume = speechVolumeState[0];
   var setSpeechVolume = speechVolumeState[1];
+  var bgmVolumeState = useState(1.0);
+  var bgmVolume = bgmVolumeState[0];
+  var setBgmVolume = bgmVolumeState[1];
 
   // 로그인 및 회원가입 상태
   var userState = useState(null);
@@ -134,11 +137,6 @@ var App = function () {
   var authTab = authTabState[0];
   var setAuthTab = authTabState[1];
 
-  // 공유된 구절 상태
-  var sharedVersesState = useState([]);
-  var sharedVerses = sharedVersesState[0];
-  var setSharedVerses = sharedVersesState[1];
-
   // Firebase 초기화 확인
   useEffect(function () {
     if (!db || !auth) {
@@ -152,10 +150,6 @@ var App = function () {
     if (!auth) return;
     var unsubscribe = auth.onAuthStateChanged(function (firebaseUser) {
       setUser(firebaseUser);
-      // 로그아웃 시 상태 초기화 제거
-      // if (!firebaseUser) {
-      //   setVerses([]);
-      // }
     });
     return function () {
       unsubscribe();
@@ -189,11 +183,12 @@ var App = function () {
     });
   }, []);
 
-  // BGM 재생 로직
+  // BGM 재생 로직 (볼륨 반영 추가)
   useEffect(function () {
     var bgmElement = document.getElementById('bgm');
     if (!bgmElement || !currentBgm) return;
     bgmElement.src = currentBgm;
+    bgmElement.volume = bgmVolume; // BGM 볼륨 적용
     if (isBgmOn) {
       bgmElement.play().catch(function (e) {
         console.error('BGM 재생 실패:', e);
@@ -202,7 +197,7 @@ var App = function () {
     } else {
       bgmElement.pause();
     }
-  }, [isBgmOn, currentBgm, bgmList]);
+  }, [isBgmOn, currentBgm, bgmList, bgmVolume]);
 
   // 한글 성경 데이터 로드
   useEffect(function () {
@@ -251,6 +246,42 @@ var App = function () {
     };
   }, [user]);
 
+  // 사용자 설정 로드 (로그인 시 Firestore에서 설정 가져오기)
+  useEffect(function () {
+    if (!db || !user) return;
+    var userId = user.uid;
+    console.log('Loading settings for user:', userId);
+    var settingsRef = db.collection('users').doc(userId).collection('settings').doc('data');
+    var unsubscribe = settingsRef.onSnapshot(function (doc) {
+      if (doc.exists) {
+        var settings = doc.data();
+        setScrollSpeed(settings.scrollSpeed || 0.5);
+        setFontSize(settings.fontSize || 1);
+        setLineHeight(settings.lineHeight || 1.2);
+        setContainerWidth(settings.containerWidth || 672);
+        setSpeechVolume(settings.speechVolume || 1.0);
+        setBgmVolume(settings.bgmVolume || 1.0);
+        console.log('Settings loaded from Firestore:', settings);
+      } else {
+        console.log('No settings found for user, initializing with defaults');
+        settingsRef.set({
+          scrollSpeed: 0.5,
+          fontSize: 1,
+          lineHeight: 1.2,
+          containerWidth: 672,
+          speechVolume: 1.0,
+          bgmVolume: 1.0
+        });
+      }
+    }, function (e) {
+      console.error('Failed to load settings from Firestore:', e);
+      setError('설정을 불러오지 못했습니다: ' + e.message);
+    });
+    return function () {
+      unsubscribe();
+    };
+  }, [user]);
+
   // 구절 저장 (로그인 상태일 때만)
   useEffect(function () {
     if (!db || !user) return;
@@ -267,28 +298,26 @@ var App = function () {
     });
   }, [verses, user]);
 
-  // 공유된 구절 로드 (실시간 업데이트)
+  // 사용자 설정 저장 (Firestore에 설정 저장)
   useEffect(function () {
-    if (!db) return;
-    var sharedRef = db.collection('shared_verses');
-    var unsubscribe = sharedRef.onSnapshot(function (querySnapshot) {
-      var shared = [];
-      querySnapshot.forEach(function (doc) {
-        shared.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-      setSharedVerses(shared);
-      console.log('Shared verses loaded:', shared);
-    }, function (e) {
-      console.error('Failed to load shared verses:', e);
-      setError('공유된 구절을 불러오지 못했습니다: ' + e.message);
+    if (!db || !user) return;
+    var userId = user.uid;
+    console.log('Saving settings for user:', userId);
+    var settingsRef = db.collection('users').doc(userId).collection('settings').doc('data');
+    settingsRef.set({
+      scrollSpeed: scrollSpeed,
+      fontSize: fontSize,
+      lineHeight: lineHeight,
+      containerWidth: containerWidth,
+      speechVolume: speechVolume,
+      bgmVolume: bgmVolume
+    }, {
+      merge: true
+    }).catch(function (e) {
+      console.error('Failed to save settings to Firestore:', e);
+      setError('설정을 저장하지 못했습니다: ' + e.message);
     });
-    return function () {
-      unsubscribe();
-    };
-  }, []);
+  }, [scrollSpeed, fontSize, lineHeight, containerWidth, speechVolume, bgmVolume, user]);
 
   // 자동 스크롤 로직
   useEffect(function () {
@@ -392,30 +421,6 @@ var App = function () {
       console.error('Logout error:', error);
       setError('로그아웃 실패: ' + error.message);
     });
-  };
-  var shareVerse = function (verse) {
-    if (!db) {
-      setError('Firebase 데이터베이스 서비스가 초기화되지 않았습니다.');
-      return;
-    }
-    if (!user) {
-      setError('로그인 후 구절을 공유할 수 있습니다.');
-      return;
-    }
-    var sharedRef = db.collection('shared_verses').doc();
-    sharedRef.set({
-      verse: verse,
-      sharedBy: user.email,
-      sharedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(function () {
-      setError('구절이 공유되었습니다.');
-    }).catch(function (e) {
-      console.error('Failed to share verse:', e);
-      setError('구절 공유 실패: ' + e.message);
-    });
-  };
-  var addSharedVerse = function (sharedVerse) {
-    setVerses(verses.concat([sharedVerse.verse]));
   };
   var searchVerses = async function () {
     setLoading(true);
@@ -857,13 +862,7 @@ var App = function () {
         deleteVerse(idx % verses.length);
       },
       className: "delete-button"
-    }, "X"), user && /*#__PURE__*/React.createElement("button", {
-      onClick: function (e) {
-        e.stopPropagation();
-        shareVerse(verse);
-      },
-      className: "share-button"
-    }, "\uACF5\uC720"));
+    }, "X"));
   })))), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
@@ -949,6 +948,23 @@ var App = function () {
       setSpeechVolume(parseFloat(e.target.value));
     },
     className: "slider"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "slider-container"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "slider-label",
+    htmlFor: "bgm-volume"
+  }, "\uBBA4\uC9C1 \uBCFC\uB968: ", bgmVolume.toFixed(1)), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    id: "bgm-volume",
+    name: "bgm-volume",
+    min: "0",
+    max: "1",
+    step: "0.1",
+    value: bgmVolume,
+    onChange: function (e) {
+      setBgmVolume(parseFloat(e.target.value));
+    },
+    className: "slider"
   })), /*#__PURE__*/React.createElement("button", {
     onClick: toggleBgm,
     className: "sound-button"
@@ -980,26 +996,6 @@ var App = function () {
     }, result.query, ": ", result.kjvText, " (KJV)"), /*#__PURE__*/React.createElement("p", {
       className: "ml-6"
     }, result.krvText, " (\uAC1C\uC5ED\uAC1C\uC815)"));
-  })), sharedVerses.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "mb-4"
-  }, /*#__PURE__*/React.createElement("h2", {
-    className: "subtitle"
-  }, "\uACF5\uC720\uB41C \uAD6C\uC808"), sharedVerses.map(function (sharedVerse) {
-    return /*#__PURE__*/React.createElement("div", {
-      key: sharedVerse.id,
-      className: "verse"
-    }, /*#__PURE__*/React.createElement("button", {
-      onClick: function () {
-        addSharedVerse(sharedVerse);
-      },
-      className: "button"
-    }, "\uCD94\uAC00"), /*#__PURE__*/React.createElement("span", {
-      className: "ml-2"
-    }, sharedVerse.verse.query, ": ", sharedVerse.verse.kjvText, " (KJV)"), /*#__PURE__*/React.createElement("p", {
-      className: "ml-6"
-    }, sharedVerse.verse.krvText, " (\uAC1C\uC5ED\uAC1C\uC815)"), /*#__PURE__*/React.createElement("p", {
-      className: "ml-6"
-    }, "\uACF5\uC720\uC790: ", sharedVerse.sharedBy));
   })), /*#__PURE__*/React.createElement("div", {
     ref: scrollRef,
     className: "scroll-area",
