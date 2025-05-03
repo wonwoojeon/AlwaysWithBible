@@ -2,19 +2,52 @@ var useState = React.useState;
 var useEffect = React.useEffect;
 var useRef = React.useRef;
 
-// Firebase Firestore 및 Auth 초기화
-var db, auth;
-try {
+// Firebase 초기화 변수
+let db, auth;
+
+// Firebase 초기화 함수
+function initializeFirebase() {
   if (typeof firebase === 'undefined') {
-    throw new Error('Firebase is not defined');
+    console.error('Firebase SDK가 로드되지 않았습니다. 재시도 중...');
+    return false;
   }
-  db = firebase.firestore();
-  auth = firebase.auth();
-} catch (e) {
-  console.error('Firebase initialization failed:', e.message);
+  const firebaseConfig = {
+    apiKey: "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o",
+    authDomain: "j2wbibleinfinitescroll.firebaseapp.com",
+    projectId: "j2wbibleinfinitescroll",
+    storageBucket: "j2wbibleinfinitescroll.firebasestorage.app",
+    messagingSenderId: "1083438447830",
+    appId: "1:1083438447830:web:2d9b2d2fecf2e3f440dd77"
+  };
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    console.log('Firebase initialized successfully in index.js');
+    return true;
+  } catch (e) {
+    console.error('Firebase initialization failed:', e.message);
+    return false;
+  }
 }
 
-var App = function() {
+// Firebase 초기화 시도 (재시도 로직 포함)
+let firebaseInitAttempts = 0;
+const maxFirebaseInitAttempts = 5;
+function tryInitializeFirebase() {
+  if (firebaseInitAttempts >= maxFirebaseInitAttempts) {
+    console.error('Firebase 초기화 최대 시도 횟수를 초과했습니다. 네트워크를 확인하거나 새로고침을 시도해주세요.');
+    return;
+  }
+  if (initializeFirebase()) {
+    return;
+  }
+  firebaseInitAttempts++;
+  setTimeout(tryInitializeFirebase, 1000); // 1초 후 재시도
+}
+tryInitializeFirebase();
+
+var App = function () {
   // 기존 상태
   var versesState = useState([]);
   var verses = versesState[0];
@@ -56,7 +89,7 @@ var App = function() {
   var koreanDataState = useState(null);
   var koreanData = koreanDataState[0];
   var setKoreanData = koreanDataState[1];
-  
+
   // BGM 관련 상태
   var bgmListState = useState([]);
   var bgmList = bgmListState[0];
@@ -64,7 +97,7 @@ var App = function() {
   var currentBgmState = useState(null);
   var currentBgm = currentBgmState[0];
   var setCurrentBgm = currentBgmState[1];
-  
+
   // BGM과 음성 소리 분리
   var isBgmOnState = useState(false);
   var isBgmOn = isBgmOnState[0];
@@ -72,12 +105,12 @@ var App = function() {
   var isVoiceOnState = useState(true);
   var isVoiceOn = isVoiceOnState[0];
   var setIsVoiceOn = isVoiceOnState[1];
-  
+
   // 음성 소리 볼륨 상태
   var speechVolumeState = useState(1.0);
   var speechVolume = speechVolumeState[0];
   var setSpeechVolume = speechVolumeState[1];
-  
+
   // 로그인 및 회원가입 상태
   var userState = useState(null);
   var user = userState[0];
@@ -108,7 +141,7 @@ var App = function() {
   var setSharedVerses = sharedVersesState[1];
 
   // Firebase 초기화 확인
-  useEffect(function() {
+  useEffect(function () {
     if (!db || !auth) {
       setError('Firebase 초기화에 실패했습니다. 새로고침 후 다시 시도해주세요.');
       return;
@@ -116,53 +149,51 @@ var App = function() {
   }, []);
 
   // 사용자 인증 상태 감지
-  useEffect(function() {
+  useEffect(function () {
     if (!auth) return;
-    var unsubscribe = auth.onAuthStateChanged(function(firebaseUser) {
+    var unsubscribe = auth.onAuthStateChanged(function (firebaseUser) {
       setUser(firebaseUser);
       if (!firebaseUser) {
         setVerses([]);
       }
     });
-    return function() { unsubscribe(); };
+    return function () {
+      unsubscribe();
+    };
   }, []);
 
   // 글자 크기 변경 시 줄간격 초기값 동기화
-  useEffect(function() {
+  useEffect(function () {
     setLineHeight(fontSize * 1.2);
   }, [fontSize]);
 
   // BGM 파일 목록 로드
-  useEffect(function() {
-    fetch('/assets/index.json')
-      .then(function(response) {
-        if (!response.ok) throw new Error('Failed to load BGM list');
-        return response.json();
-      })
-      .then(function(data) {
-        var bgmFiles = data.bgmFiles.map(function(file) {
-          return `/assets/${file}`;
-        });
-        setBgmList(bgmFiles);
-        if (bgmFiles.length > 0) {
-          var randomIndex = Math.floor(Math.random() * bgmFiles.length);
-          setCurrentBgm(bgmFiles[randomIndex]);
-        }
-      })
-      .catch(function(err) {
-        console.error('Error loading BGM list:', err.message);
-        setError('BGM 목록을 불러오지 못했습니다: ' + err.message);
+  useEffect(function () {
+    fetch('/assets/index.json').then(function (response) {
+      if (!response.ok) throw new Error('Failed to load BGM list');
+      return response.json();
+    }).then(function (data) {
+      var bgmFiles = data.bgmFiles.map(function (file) {
+        return `/assets/${file}`;
       });
+      setBgmList(bgmFiles);
+      if (bgmFiles.length > 0) {
+        var randomIndex = Math.floor(Math.random() * bgmFiles.length);
+        setCurrentBgm(bgmFiles[randomIndex]);
+      }
+    }).catch(function (err) {
+      console.error('Error loading BGM list:', err.message);
+      setError('BGM 목록을 불러오지 못했습니다: ' + err.message);
+    });
   }, []);
 
   // BGM 재생 로직
-  useEffect(function() {
+  useEffect(function () {
     var bgmElement = document.getElementById('bgm');
     if (!bgmElement || !currentBgm) return;
-
     bgmElement.src = currentBgm;
     if (isBgmOn) {
-      bgmElement.play().catch(function(e) {
+      bgmElement.play().catch(function (e) {
         console.error('BGM 재생 실패:', e);
         setError('BGM 재생에 실패했습니다: 브라우저 정책에 의해 차단되었거나 파일을 로드할 수 없습니다. (' + e.message + ')');
       });
@@ -170,31 +201,27 @@ var App = function() {
       bgmElement.pause();
     }
   }, [isBgmOn, currentBgm, bgmList]);
-
-  useEffect(function() {
+  useEffect(function () {
     console.log('Fetching ko_rev.json...');
-    fetch('/assets/ko_rev.json')
-      .then(function(response) {
-        if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText + '. Please ensure the file exists in the /assets directory on your server.');
-        return response.json();
-      })
-      .then(function(data) {
-        setKoreanData(data);
-        console.log('ko_rev.json loaded:', data);
-      })
-      .catch(function(err) {
-        console.error('Error loading ko_rev.json:', err.message);
-        setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message + '. 서버에 /assets/ko_rev.json 파일이 있는지 확인해주세요.');
-      });
+    fetch('/assets/ko_rev.json').then(function (response) {
+      if (!response.ok) throw new Error('Failed to load ko_rev.json: ' + response.status + ' ' + response.statusText + '. Please ensure the file exists in the /assets directory on your server.');
+      return response.json();
+    }).then(function (data) {
+      setKoreanData(data);
+      console.log('ko_rev.json loaded:', data);
+    }).catch(function (err) {
+      console.error('Error loading ko_rev.json:', err.message);
+      setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message + '. 서버에 /assets/ko_rev.json 파일이 있는지 확인해주세요.');
+    });
   }, []);
 
   // 로그인 상태에 따라 구절 로드 (실시간 업데이트)
-  useEffect(function() {
+  useEffect(function () {
     if (!db || !user) return;
     var userId = user.uid;
     console.log('Subscribing to verses for user:', userId);
     var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
-    var unsubscribe = versesRef.onSnapshot(function(doc) {
+    var unsubscribe = versesRef.onSnapshot(function (doc) {
       if (doc.exists) {
         var savedVerses = doc.data().verses || [];
         setVerses(savedVerses);
@@ -203,47 +230,55 @@ var App = function() {
         console.log('No verses found for user, initializing empty array');
         setVerses([]);
       }
-    }, function(e) {
+    }, function (e) {
       console.error('Failed to load verses from Firestore:', e);
       setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
     });
-    return function() { unsubscribe(); };
+    return function () {
+      unsubscribe();
+    };
   }, [user]);
 
   // 구절 저장 (로그인 상태일 때만)
-  useEffect(function() {
+  useEffect(function () {
     if (!db || !user) return;
     var userId = user.uid;
     console.log('Saving verses for user:', userId, verses);
     var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
-    versesRef.set({ verses: verses }).catch(function(e) {
+    versesRef.set({
+      verses: verses
+    }).catch(function (e) {
       console.error('Failed to save verses to Firestore:', e);
       setError('구절을 저장하지 못했습니다: ' + e.message);
     });
   }, [verses, user]);
 
   // 공유된 구절 로드 (실시간 업데이트)
-  useEffect(function() {
+  useEffect(function () {
     if (!db) return;
     var sharedRef = db.collection('shared_verses');
-    var unsubscribe = sharedRef.onSnapshot(function(querySnapshot) {
+    var unsubscribe = sharedRef.onSnapshot(function (querySnapshot) {
       var shared = [];
-      querySnapshot.forEach(function(doc) {
-        shared.push({ id: doc.id, ...doc.data() });
+      querySnapshot.forEach(function (doc) {
+        shared.push({
+          id: doc.id,
+          ...doc.data()
+        });
       });
       setSharedVerses(shared);
       console.log('Shared verses loaded:', shared);
-    }, function(e) {
+    }, function (e) {
       console.error('Failed to load shared verses:', e);
       setError('공유된 구절을 불러오지 못했습니다: ' + e.message);
     });
-    return function() { unsubscribe(); };
+    return function () {
+      unsubscribe();
+    };
   }, []);
-
-  useEffect(function() {
+  useEffect(function () {
     console.log('Starting auto-scroll with speed:', scrollSpeed);
-    var scroll = function() {
-      setScrollPos(function(prev) {
+    var scroll = function () {
+      setScrollPos(function (prev) {
         if (!scrollRef.current || verses.length === 0) return prev;
         var maxHeight = scrollRef.current.scrollHeight - scrollRef.current.clientHeight;
         if (maxHeight <= 0) return prev;
@@ -255,42 +290,39 @@ var App = function() {
       });
     };
     var interval = setInterval(scroll, 16);
-    return function() { clearInterval(interval); };
+    return function () {
+      clearInterval(interval);
+    };
   }, [scrollSpeed, verses]);
-
-  useEffect(function() {
+  useEffect(function () {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollPos;
       console.log('Scroll position updated:', scrollPos);
     }
   }, [scrollPos]);
-
-  useEffect(function() {
+  useEffect(function () {
     var newSpeechRate = 0.5 + (scrollSpeed - 0.1) * (1.5 / 1.9);
     setSpeechRate(Math.min(Math.max(newSpeechRate, 0.5), 2));
     console.log('Speech rate updated:', newSpeechRate);
   }, [scrollSpeed]);
-
   var animationDuration = verses.length > 0 ? 10 + verses.length * 2 : 10;
-
-  var toggleBgm = function() {
+  var toggleBgm = function () {
     setIsBgmOn(!isBgmOn);
   };
-
-  var toggleVoice = function() {
+  var toggleVoice = function () {
     if (isVoiceOn) {
       window.speechSynthesis.cancel();
     }
     setIsVoiceOn(!isVoiceOn);
   };
-
-  var deleteVerse = function(index) {
+  var deleteVerse = function (index) {
     console.log('Deleting verse at index:', index);
-    var updatedVerses = verses.filter(function(_, i) { return i !== index; });
+    var updatedVerses = verses.filter(function (_, i) {
+      return i !== index;
+    });
     setVerses(updatedVerses);
   };
-
-  var signup = function() {
+  var signup = function () {
     if (!auth) {
       setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
       return;
@@ -303,20 +335,17 @@ var App = function() {
       setError('비밀번호는 최소 8자 이상이어야 합니다.');
       return;
     }
-    auth.createUserWithEmailAndPassword(signupUsername, signupPassword)
-      .then(function(userCredential) {
-        setError('회원가입이 완료되었습니다. 로그인해주세요.');
-        setSignupUsername('');
-        setSignupPassword('');
-        setShowAuthPopup(false);
-      })
-      .catch(function(error) {
-        console.error('Signup error:', error);
-        setError('회원가입 실패: ' + error.message);
-      });
+    auth.createUserWithEmailAndPassword(signupUsername, signupPassword).then(function (userCredential) {
+      setError('회원가입이 완료되었습니다. 로그인해주세요.');
+      setSignupUsername('');
+      setSignupPassword('');
+      setShowAuthPopup(false);
+    }).catch(function (error) {
+      console.error('Signup error:', error);
+      setError('회원가입 실패: ' + error.message);
+    });
   };
-
-  var login = function() {
+  var login = function () {
     if (!auth) {
       setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
       return;
@@ -325,35 +354,31 @@ var App = function() {
       setError('이메일과 비밀번호를 모두 입력해주세요.');
       return;
     }
-    auth.signInWithEmailAndPassword(username, password)
-      .then(function(userCredential) {
-        setError('');
-        setUsername('');
-        setPassword('');
-        setShowAuthPopup(false);
-      })
-      .catch(function(error) {
-        console.error('Login error:', error);
-        setError('로그인 실패: ' + error.message);
-      });
+    auth.signInWithEmailAndPassword(username, password).then(function (userCredential) {
+      setError('');
+      setUsername('');
+      setPassword('');
+      setShowAuthPopup(false);
+    }).catch(function (error) {
+      console.error('Login error:', error);
+      setError('로그인 실패: ' + error.message);
+    });
   };
-
-  var logout = function() {
+  var logout = function () {
     if (!auth) {
       setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
       return;
     }
-    auth.signOut().then(function() {
+    auth.signOut().then(function () {
       setUser(null);
       setVerses([]);
       setError('');
-    }).catch(function(error) {
+    }).catch(function (error) {
       console.error('Logout error:', error);
       setError('로그아웃 실패: ' + error.message);
     });
   };
-
-  var shareVerse = function(verse) {
+  var shareVerse = function (verse) {
     if (!db) {
       setError('Firebase 데이터베이스 서비스가 초기화되지 않았습니다.');
       return;
@@ -367,24 +392,24 @@ var App = function() {
       verse: verse,
       sharedBy: user.email,
       sharedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(function() {
+    }).then(function () {
       setError('구절이 공유되었습니다.');
-    }).catch(function(e) {
+    }).catch(function (e) {
       console.error('Failed to share verse:', e);
       setError('구절 공유 실패: ' + e.message);
     });
   };
-
-  var addSharedVerse = function(sharedVerse) {
+  var addSharedVerse = function (sharedVerse) {
     setVerses(verses.concat([sharedVerse.verse]));
   };
-
-  var searchVerses = async function() {
+  var searchVerses = async function () {
     setLoading(true);
     setError('');
     console.log('Starting search with input:', input);
     try {
-      var queries = input.split(',').map(function(q) { return q.trim(); });
+      var queries = input.split(',').map(function (q) {
+        return q.trim();
+      });
       var results = [];
       var bookMap = {
         '창세기': 'Genesis',
@@ -458,7 +483,6 @@ var App = function() {
       for (var key in bookMap) {
         bookMapReverse[bookMap[key]] = key;
       }
-
       for (var i = 0; i < queries.length; i++) {
         var query = queries[i];
         console.log('Processing query:', query);
@@ -483,7 +507,6 @@ var App = function() {
         }
         var formattedQuery = book + '+' + chapter;
         console.log('Formatted query for API:', formattedQuery);
-
         var kjvText = '영어 구절을 불러오지 못했습니다.';
         try {
           console.log('Fetching KJV data for:', formattedQuery);
@@ -494,17 +517,14 @@ var App = function() {
           var kjvData = await kjvResponse.json();
           console.log('KJV API response:', kjvData);
           if (kjvData.error) throw new Error(kjvData.error);
-
           if (!kjvData.verses || kjvData.verses.length === 0) {
             throw new Error('해당 구절을 찾을 수 없습니다.');
           }
-          var verses = kjvData.verses
-            .filter(function(verseData) {
-              return endVerse === Infinity || (verseData.verse >= startVerse && verseData.verse <= endVerse);
-            })
-            .map(function(verseData) {
-              return verseData.verse + ': ' + verseData.text.trim();
-            });
+          var verses = kjvData.verses.filter(function (verseData) {
+            return endVerse === Infinity || verseData.verse >= startVerse && verseData.verse <= endVerse;
+          }).map(function (verseData) {
+            return verseData.verse + ': ' + verseData.text.trim();
+          });
           if (verses.length === 0) {
             throw new Error('해당 절 범위를 찾을 수 없습니다.');
           }
@@ -514,13 +534,14 @@ var App = function() {
           console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError.message);
           kjvText = '영어 구절을 불러오지 못했습니다: ' + kjvError.message;
         }
-
         var krvText = '한글 구절을 불러오지 못했습니다.';
         try {
           if (!koreanData) throw new Error('한글 성경 데이터가 로드되지 않았습니다.');
           var bookName = bookMapReverse[book] || book;
           console.log('Looking for book:', bookName);
-          var bookData = koreanData.find(function(b) { return b.name === bookName; });
+          var bookData = koreanData.find(function (b) {
+            return b.name === bookName;
+          });
           if (bookData) {
             console.log('Book found:', bookData.name);
             var chapterData = bookData.chapters[parseInt(chapter) - 1];
@@ -549,8 +570,11 @@ var App = function() {
           console.warn('한글 구절 데이터를 가져오지 못했습니다:', krvError.message);
           krvText = '한글 구절을 불러오지 못했습니다: ' + krvError.message;
         }
-
-        results.push({ query: query, kjvText: kjvText, krvText: krvText });
+        results.push({
+          query: query,
+          kjvText: kjvText,
+          krvText: krvText
+        });
       }
       setSearchResults(results);
       console.log('Search results:', results);
@@ -561,11 +585,12 @@ var App = function() {
       setLoading(false);
     }
   };
-
-  var addVerses = function(verse, index) {
+  var addVerses = function (verse, index) {
     console.log('Adding verse to scroll list:', verse);
     setVerses(verses.concat([verse]));
-    var updatedResults = searchResults.filter(function(_, i) { return i !== index; });
+    var updatedResults = searchResults.filter(function (_, i) {
+      return i !== index;
+    });
     setSearchResults(updatedResults);
     if (isVoiceOn) {
       var utterance = new SpeechSynthesisUtterance(verse.kjvText);
@@ -573,7 +598,6 @@ var App = function() {
       utterance.rate = speechRate;
       utterance.volume = speechVolume;
       window.speechSynthesis.speak(utterance);
-
       var krUtterance = new SpeechSynthesisUtterance(verse.krvText);
       krUtterance.lang = 'ko-KR';
       krUtterance.rate = speechRate;
@@ -581,8 +605,7 @@ var App = function() {
       window.speechSynthesis.speak(krUtterance);
     }
   };
-
-  var formatVerseHeader = function(query) {
+  var formatVerseHeader = function (query) {
     var bookMatchResult = query.match(/^(\D+)/);
     var bookMatch = bookMatchResult && bookMatchResult[1] ? bookMatchResult[1].trim() : null;
     var verseMatchResult = query.match(/(\d+(?::\d+(?:~\d+)?)?)/);
@@ -598,7 +621,6 @@ var App = function() {
       startVerse = null;
       endVerse = null;
     }
-
     var bookMap = {
       '창세기': 'Genesis',
       '출애굽기': 'Exodus',
@@ -671,309 +693,288 @@ var App = function() {
     for (var key in bookMap) {
       bookMapReverse[bookMap[key]] = key;
     }
-
     var bookEng = bookMap[bookMatch] || bookMatch;
     var bookKor = bookMapReverse[bookEng] || bookMatch;
-
-    var korHeader = startVerse && endVerse
-      ? `${bookKor} ${chapter}장 ${startVerse}절~${endVerse}절`
-      : `${bookKor} ${chapter}장`;
-    var engHeader = startVerse && endVerse
-      ? `${bookEng} ${chapter}:${startVerse}-${endVerse}`
-      : `${bookEng} ${chapter}`;
-
-    return { korHeader, engHeader };
+    var korHeader = startVerse && endVerse ? `${bookKor} ${chapter}장 ${startVerse}절~${endVerse}절` : `${bookKor} ${chapter}장`;
+    var engHeader = startVerse && endVerse ? `${bookEng} ${chapter}:${startVerse}-${endVerse}` : `${bookEng} ${chapter}`;
+    return {
+      korHeader,
+      engHeader
+    };
   };
-
-  return (
-    <div className="container" style={{ maxWidth: containerWidth + 'px' }}>
-      <div className="title-bar">
-        <h1 className="title">j2w_2027 Bible Infinite Scroll</h1>
-        <div className="button-group">
-          <button
-            onClick={function() { setShowAuthPopup(true); }}
-            className="user-icon"
-          >
-            😊
-          </button>
-          <button
-            onClick={function() { setIsCollapsed(!isCollapsed); }}
-            className="toggle-button"
-          >
-            {isCollapsed ? '▼' : '▲'}
-          </button>
-        </div>
-      </div>
-      {showAuthPopup && (
-        <>
-          <div className="auth-popup-overlay" onClick={function() { setShowAuthPopup(false); }}></div>
-          <div className="auth-popup">
-            <button
-              onClick={function() { setShowAuthPopup(false); }}
-              className="auth-popup-close"
-            >
-              ×
-            </button>
-            {user ? (
-              <div>
-                <p>환영합니다, {user.email}님!</p>
-                <button onClick={logout} className="button">로그아웃</button>
-              </div>
-            ) : (
-              <>
-                <div className="auth-tabs">
-                  <button
-                    className={`auth-tab ${authTab === 'login' ? 'active' : ''}`}
-                    onClick={function() { setAuthTab('login'); setError(''); }}
-                  >
-                    로그인
-                  </button>
-                  <button
-                    className={`auth-tab ${authTab === 'signup' ? 'active' : ''}`}
-                    onClick={function() { setAuthTab('signup'); setError(''); }}
-                  >
-                    회원가입
-                  </button>
-                </div>
-                {authTab === 'login' && (
-                  <div>
-                    <input
-                      type="email"
-                      value={username}
-                      onChange={function(e) { setUsername(e.target.value); }}
-                      placeholder="이메일 (예: user@example.com)"
-                      className="input"
-                    />
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={function(e) { setPassword(e.target.value); }}
-                      placeholder="비밀번호"
-                      className="input"
-                    />
-                    <button onClick={login} className="button">로그인</button>
-                  </div>
-                )}
-                {authTab === 'signup' && (
-                  <div>
-                    <input
-                      type="email"
-                      value={signupUsername}
-                      onChange={function(e) { setSignupUsername(e.target.value); }}
-                      placeholder="이메일 (예: user@example.com)"
-                      className="input"
-                    />
-                    <input
-                      type="password"
-                      value={signupPassword}
-                      onChange={function(e) { setSignupPassword(e.target.value); }}
-                      placeholder="비밀번호 (8자 이상)"
-                      className="input"
-                    />
-                    <button onClick={signup} className="button">회원가입</button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </>
-      )}
-      {!isCollapsed && (
-        <div>
-          <div className="mb-4">
-            <input
-              type="text"
-              value={input}
-              onChange={function(e) { setInput(e.target.value); }}
-              placeholder="예: 창세기 1:1~5, 시편 23"
-              className="input"
-            />
-            <button
-              onClick={searchVerses}
-              className="button"
-            >
-              검색
-            </button>
-            {verses.length > 0 && (
-              <div className="selected-verses">
-                <div
-                  className="selected-verses-container"
-                  style={{ animationDuration: animationDuration + 's' }}
-                >
-                  {verses.concat(verses).map(function(verse, idx) {
-                    return (
-                      <div key={idx} className="selected-verse-item">
-                        <span>{verse.query}</span>
-                        <button
-                          onClick={function(e) {
-                            e.stopPropagation();
-                            deleteVerse(idx % verses.length);
-                          }}
-                          className="delete-button"
-                        >
-                          X
-                        </button>
-                        {user && (
-                          <button
-                            onClick={function(e) {
-                              e.stopPropagation();
-                              shareVerse(verse);
-                            }}
-                            className="share-button"
-                          >
-                            공유
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="slider-container">
-            <label className="slider-label">스크롤 속도: {scrollSpeed.toFixed(1)}</label>
-            <input
-              type="range"
-              min="0.1"
-              max="2"
-              step="0.1"
-              value={scrollSpeed}
-              onChange={function(e) { setScrollSpeed(parseFloat(e.target.value)); }}
-              className="slider"
-            />
-            <p>음성 재생 속도: {speechRate.toFixed(1)}</p>
-          </div>
-          <div className="slider-container">
-            <label className="slider-label">글자 크기: {fontSize.toFixed(1)}rem</label>
-            <input
-              type="range"
-              min="0.8"
-              max="4"
-              step="0.1"
-              value={fontSize}
-              onChange={function(e) { setFontSize(parseFloat(e.target.value)); }}
-              className="slider"
-            />
-          </div>
-          <div className="slider-container">
-            <label className="slider-label">줄간격: {lineHeight.toFixed(1)}rem</label>
-            <input
-              type="range"
-              min="1.2"
-              max="4.0"
-              step="0.1"
-              value={lineHeight}
-              onChange={function(e) { setLineHeight(parseFloat(e.target.value)); }}
-              className="slider"
-            />
-          </div>
-          <div className="slider-container">
-            <label className="slider-label">본문 너비: {containerWidth}px</label>
-            <input
-              type="range"
-              min="400"
-              max="1300"
-              step="10"
-              value={containerWidth}
-              onChange={function(e) { setContainerWidth(parseInt(e.target.value)); }}
-              className="slider"
-            />
-          </div>
-          <div className="slider-container">
-            <label className="slider-label">음성 볼륨: {speechVolume.toFixed(1)}</label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={speechVolume}
-              onChange={function(e) { setSpeechVolume(parseFloat(e.target.value)); }}
-              className="slider"
-            />
-          </div>
-          <button
-            onClick={toggleBgm}
-            className="sound-button"
-          >
-            {isBgmOn ? '🎵 BGM 끄기' : '🎶 BGM 켜기'}
-          </button>
-          <button
-            onClick={toggleVoice}
-            className="sound-button"
-          >
-            {isVoiceOn ? '🗣️ 음성 끄기' : '🔈 음성 켜기'}
-          </button>
-        </div>
-      )}
-      {loading && <p className="loading">검색 중...</p>}
-      {error && <div className="error">{error}</div>}
-      {searchResults.length > 0 && (
-        <div className="mb-4">
-          <h2 className="subtitle">검색 결과</h2>
-          {searchResults.map(function(result, idx) {
-            return (
-              <div key={result.query} className="verse">
-                <input
-                  type="checkbox"
-                  onChange={function() { addVerses(result, idx); }}
-                />
-                <span className="ml-2">{result.query}: {result.kjvText} (KJV)</span>
-                <p className="ml-6">{result.krvText} (개역개정)</p>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {sharedVerses.length > 0 && (
-        <div className="mb-4">
-          <h2 className="subtitle">공유된 구절</h2>
-          {sharedVerses.map(function(sharedVerse) {
-            return (
-              <div key={sharedVerse.id} className="verse">
-                <button
-                  onClick={function() { addSharedVerse(sharedVerse); }}
-                  className="button"
-                >
-                  추가
-                </button>
-                <span className="ml-2">{sharedVerse.verse.query}: {sharedVerse.verse.kjvText} (KJV)</span>
-                <p className="ml-6">{sharedVerse.verse.krvText} (개역개정)</p>
-                <p className="ml-6">공유자: {sharedVerse.sharedBy}</p>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      <div
-        ref={scrollRef}
-        className="scroll-area"
-        style={{
-          height: isCollapsed ? 'calc(100vh - 60px)' : '70vh'
-        }}
-      >
-        {verses.length > 0 ? (
-          <div className="scroll-content">
-            {[...Array(100)].map(function(_, idx) {
-              var verse = verses[idx % verses.length];
-              var headers = formatVerseHeader(verse.query);
-              return (
-                <div key={idx} className="verse">
-                  <div className="verse-header">{headers.korHeader}</div>
-                  <div className="verse-header">{headers.engHeader}</div>
-                  <p style={{ fontSize: fontSize + 'rem', lineHeight: lineHeight + 'rem' }}>{verse.kjvText} (KJV)</p>
-                  <p style={{ fontSize: fontSize + 'rem', lineHeight: lineHeight + 'rem' }}>{verse.krvText} (개역개정)</p>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p>구절을 추가하세요.</p>
-        )}
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "container",
+    style: {
+      maxWidth: containerWidth + 'px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "title-bar"
+  }, /*#__PURE__*/React.createElement("h1", {
+    className: "title"
+  }, "j2w_2027 Bible Infinite Scroll"), /*#__PURE__*/React.createElement("div", {
+    className: "button-group"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowAuthPopup(true);
+    },
+    className: "user-icon"
+  }, "\uD83D\uDE0A"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setIsCollapsed(!isCollapsed);
+    },
+    className: "toggle-button"
+  }, isCollapsed ? '▼' : '▲'))), showAuthPopup && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "auth-popup-overlay",
+    onClick: function () {
+      setShowAuthPopup(false);
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "auth-popup"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowAuthPopup(false);
+    },
+    className: "auth-popup-close"
+  }, "\xD7"), user ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", null, "\uD658\uC601\uD569\uB2C8\uB2E4, ", user.email, "\uB2D8!"), /*#__PURE__*/React.createElement("button", {
+    onClick: logout,
+    className: "button"
+  }, "\uB85C\uADF8\uC544\uC6C3")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "auth-tabs"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: `auth-tab ${authTab === 'login' ? 'active' : ''}`,
+    onClick: function () {
+      setAuthTab('login');
+      setError('');
+    }
+  }, "\uB85C\uADF8\uC778"), /*#__PURE__*/React.createElement("button", {
+    className: `auth-tab ${authTab === 'signup' ? 'active' : ''}`,
+    onClick: function () {
+      setAuthTab('signup');
+      setError('');
+    }
+  }, "\uD68C\uC6D0\uAC00\uC785")), authTab === 'login' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: username,
+    onChange: function (e) {
+      setUsername(e.target.value);
+    },
+    placeholder: "\uC774\uBA54\uC77C (\uC608: user@example.com)",
+    className: "input"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    value: password,
+    onChange: function (e) {
+      setPassword(e.target.value);
+    },
+    placeholder: "\uBE44\uBC00\uBC88\uD638",
+    className: "input"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: login,
+    className: "button"
+  }, "\uB85C\uADF8\uC778")), authTab === 'signup' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: signupUsername,
+    onChange: function (e) {
+      setSignupUsername(e.target.value);
+    },
+    placeholder: "\uC774\uBA54\uC77C (\uC608: user@example.com)",
+    className: "input"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    value: signupPassword,
+    onChange: function (e) {
+      setSignupPassword(e.target.value);
+    },
+    placeholder: "\uBE44\uBC00\uBC88\uD638 (8\uC790 \uC774\uC0C1)",
+    className: "input"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: signup,
+    className: "button"
+  }, "\uD68C\uC6D0\uAC00\uC785"))))), !isCollapsed && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "mb-4"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: input,
+    onChange: function (e) {
+      setInput(e.target.value);
+    },
+    placeholder: "\uC608: \uCC3D\uC138\uAE30 1:1~5, \uC2DC\uD3B8 23",
+    className: "input"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: searchVerses,
+    className: "button"
+  }, "\uAC80\uC0C9"), verses.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "selected-verses"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "selected-verses-container",
+    style: {
+      animationDuration: animationDuration + 's'
+    }
+  }, verses.concat(verses).map(function (verse, idx) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: idx,
+      className: "selected-verse-item"
+    }, /*#__PURE__*/React.createElement("span", null, verse.query), /*#__PURE__*/React.createElement("button", {
+      onClick: function (e) {
+        e.stopPropagation();
+        deleteVerse(idx % verses.length);
+      },
+      className: "delete-button"
+    }, "X"), user && /*#__PURE__*/React.createElement("button", {
+      onClick: function (e) {
+        e.stopPropagation();
+        shareVerse(verse);
+      },
+      className: "share-button"
+    }, "\uACF5\uC720"));
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "slider-container"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "slider-label"
+  }, "\uC2A4\uD06C\uB864 \uC18D\uB3C4: ", scrollSpeed.toFixed(1)), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: "0.1",
+    max: "2",
+    step: "0.1",
+    value: scrollSpeed,
+    onChange: function (e) {
+      setScrollSpeed(parseFloat(e.target.value));
+    },
+    className: "slider"
+  }), /*#__PURE__*/React.createElement("p", null, "\uC74C\uC131 \uC7AC\uC0DD \uC18D\uB3C4: ", speechRate.toFixed(1))), /*#__PURE__*/React.createElement("div", {
+    className: "slider-container"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "slider-label"
+  }, "\uAE00\uC790 \uD06C\uAE30: ", fontSize.toFixed(1), "rem"), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: "0.8",
+    max: "4",
+    step: "0.1",
+    value: fontSize,
+    onChange: function (e) {
+      setFontSize(parseFloat(e.target.value));
+    },
+    className: "slider"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "slider-container"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "slider-label"
+  }, "\uC904\uAC04\uACA9: ", lineHeight.toFixed(1), "rem"), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: "1.2",
+    max: "4.0",
+    step: "0.1",
+    value: lineHeight,
+    onChange: function (e) {
+      setLineHeight(parseFloat(e.target.value));
+    },
+    className: "slider"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "slider-container"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "slider-label"
+  }, "\uBCF8\uBB38 \uB108\uBE44: ", containerWidth, "px"), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: "400",
+    max: "1300",
+    step: "10",
+    value: containerWidth,
+    onChange: function (e) {
+      setContainerWidth(parseInt(e.target.value));
+    },
+    className: "slider"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "slider-container"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "slider-label"
+  }, "\uC74C\uC131 \uBCFC\uB968: ", speechVolume.toFixed(1)), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: "0",
+    max: "1",
+    step: "0.1",
+    value: speechVolume,
+    onChange: function (e) {
+      setSpeechVolume(parseFloat(e.target.value));
+    },
+    className: "slider"
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: toggleBgm,
+    className: "sound-button"
+  }, isBgmOn ? '🎵 BGM 끄기' : '🎶 BGM 켜기'), /*#__PURE__*/React.createElement("button", {
+    onClick: toggleVoice,
+    className: "sound-button"
+  }, isVoiceOn ? '🗣️ 음성 끄기' : '🔈 음성 켜기')), loading && /*#__PURE__*/React.createElement("p", {
+    className: "loading"
+  }, "\uAC80\uC0C9 \uC911..."), error && /*#__PURE__*/React.createElement("div", {
+    className: "error"
+  }, error), searchResults.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "mb-4"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "subtitle"
+  }, "\uAC80\uC0C9 \uACB0\uACFC"), searchResults.map(function (result, idx) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: result.query,
+      className: "verse"
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      onChange: function () {
+        addVerses(result, idx);
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      className: "ml-2"
+    }, result.query, ": ", result.kjvText, " (KJV)"), /*#__PURE__*/React.createElement("p", {
+      className: "ml-6"
+    }, result.krvText, " (\uAC1C\uC5ED\uAC1C\uC815)"));
+  })), sharedVerses.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "mb-4"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "subtitle"
+  }, "\uACF5\uC720\uB41C \uAD6C\uC808"), sharedVerses.map(function (sharedVerse) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: sharedVerse.id,
+      className: "verse"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        addSharedVerse(sharedVerse);
+      },
+      className: "button"
+    }, "\uCD94\uAC00"), /*#__PURE__*/React.createElement("span", {
+      className: "ml-2"
+    }, sharedVerse.verse.query, ": ", sharedVerse.verse.kjvText, " (KJV)"), /*#__PURE__*/React.createElement("p", {
+      className: "ml-6"
+    }, sharedVerse.verse.krvText, " (\uAC1C\uC5ED\uAC1C\uC815)"), /*#__PURE__*/React.createElement("p", {
+      className: "ml-6"
+    }, "\uACF5\uC720\uC790: ", sharedVerse.sharedBy));
+  })), /*#__PURE__*/React.createElement("div", {
+    ref: scrollRef,
+    className: "scroll-area",
+    style: {
+      height: isCollapsed ? 'calc(100vh - 60px)' : '70vh'
+    }
+  }, verses.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "scroll-content"
+  }, [...Array(100)].map(function (_, idx) {
+    var verse = verses[idx % verses.length];
+    var headers = formatVerseHeader(verse.query);
+    return /*#__PURE__*/React.createElement("div", {
+      key: idx,
+      className: "verse"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "verse-header"
+    }, headers.korHeader), /*#__PURE__*/React.createElement("div", {
+      className: "verse-header"
+    }, headers.engHeader), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: fontSize + 'rem',
+        lineHeight: lineHeight + 'rem'
+      }
+    }, verse.kjvText, " (KJV)"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: fontSize + 'rem',
+        lineHeight: lineHeight + 'rem'
+      }
+    }, verse.krvText, " (\uAC1C\uC5ED\uAC1C\uC815)"));
+  })) : /*#__PURE__*/React.createElement("p", null, "\uAD6C\uC808\uC744 \uCD94\uAC00\uD558\uC138\uC694.")));
 };
-
-ReactDOM.render(<App />, document.getElementById('root'));
+ReactDOM.render(/*#__PURE__*/React.createElement(App, null), document.getElementById('root'));
 console.log('App rendered successfully.');

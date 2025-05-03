@@ -2,17 +2,50 @@ var useState = React.useState;
 var useEffect = React.useEffect;
 var useRef = React.useRef;
 
-// Firebase Firestore 및 Auth 초기화
-var db, auth;
-try {
+// Firebase 초기화 변수
+let db, auth;
+
+// Firebase 초기화 함수
+function initializeFirebase() {
   if (typeof firebase === 'undefined') {
-    throw new Error('Firebase is not defined');
+    console.error('Firebase SDK가 로드되지 않았습니다. 재시도 중...');
+    return false;
   }
-  db = firebase.firestore();
-  auth = firebase.auth();
-} catch (e) {
-  console.error('Firebase initialization failed:', e.message);
+  const firebaseConfig = {
+    apiKey: "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o",
+    authDomain: "j2wbibleinfinitescroll.firebaseapp.com",
+    projectId: "j2wbibleinfinitescroll",
+    storageBucket: "j2wbibleinfinitescroll.firebasestorage.app",
+    messagingSenderId: "1083438447830",
+    appId: "1:1083438447830:web:2d9b2d2fecf2e3f440dd77"
+  };
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    console.log('Firebase initialized successfully in index.js');
+    return true;
+  } catch (e) {
+    console.error('Firebase initialization failed:', e.message);
+    return false;
+  }
 }
+
+// Firebase 초기화 시도 (재시도 로직 포함)
+let firebaseInitAttempts = 0;
+const maxFirebaseInitAttempts = 5;
+function tryInitializeFirebase() {
+  if (firebaseInitAttempts >= maxFirebaseInitAttempts) {
+    console.error('Firebase 초기화 최대 시도 횟수를 초과했습니다. 네트워크를 확인하거나 새로고침을 시도해주세요.');
+    return;
+  }
+  if (initializeFirebase()) {
+    return;
+  }
+  firebaseInitAttempts++;
+  setTimeout(tryInitializeFirebase, 1000); // 1초 후 재시도
+}
+tryInitializeFirebase();
 var App = function () {
   // 기존 상태
   var versesState = useState([]);
