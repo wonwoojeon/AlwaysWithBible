@@ -46,21 +46,38 @@
 <title>j2w_2027 Bible Infinite Scroll</title>
 <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-<!-- Firebase SDK 추가 (Compat 버전으로 변경) -->
-<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/compat/firebase-app-compat.min.js" onload="window.firebaseLoaded = true" onerror="window.firebaseLoaded = false"></script>
-<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/compat/firebase-firestore-compat.min.js" onload="window.firestoreLoaded = true" onerror="window.firestoreLoaded = false"></script>
-<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/compat/firebase-auth-compat.min.js" onload="window.authLoaded = true" onerror="window.authLoaded = false"></script>
+<!-- Firebase SDK 로드 전 함수 정의 -->
 <script>
-// Firebase SDK 로드 상태 확인 및 초기화
-window.onload = function() {
-if (!window.firebaseLoaded || !window.firestoreLoaded || !window.authLoaded) {
-  console.error('One or more Firebase SDKs failed to load from CDN.');
-  document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 네트워크를 확인하거나 나중에 다시 시도해주세요.</div>';
-  return;
+window.firebaseLoaded = false;
+window.firestoreLoaded = false;
+window.authLoaded = false;
+
+function loadFirebaseFallback(scriptName) {
+console.warn('CDN load failed, attempting to load from local fallback: ' + scriptName);
+var script = document.createElement('script');
+script.src = '/lib/' + scriptName;
+script.onload = function() {
+  if (scriptName.includes('firebase-app')) window.firebaseLoaded = true;
+  if (scriptName.includes('firebase-firestore')) window.firestoreLoaded = true;
+  if (scriptName.includes('firebase-auth')) window.authLoaded = true;
+  checkFirebaseLoadStatus();
+};
+script.onerror = function() {
+  console.error('Failed to load fallback for ' + scriptName);
+  document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 로컬 폴백도 실패했습니다.</div>';
+};
+document.head.appendChild(script);
 }
 
+function checkFirebaseLoadStatus() {
+if (window.firebaseLoaded && window.firestoreLoaded && window.authLoaded) {
+  initializeFirebase();
+}
+}
+
+function initializeFirebase() {
 if (typeof firebase === 'undefined') {
-  console.error('Firebase SDK failed to load from CDN.');
+  console.error('Firebase SDK failed to load from CDN and fallback.');
   document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 네트워크를 확인하거나 나중에 다시 시도해주세요.</div>';
 } else {
   var firebaseConfig = {
@@ -79,6 +96,20 @@ if (typeof firebase === 'undefined') {
     document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase 초기화에 실패했습니다: ' + e.message + '</div>';
   }
 }
+}
+</script>
+<!-- Firebase SDK 추가 (Google Firebase CDN 사용) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" onload="window.firebaseLoaded = true" onerror="window.firebaseLoaded = false; loadFirebaseFallback('firebase-app-compat-10.12.5.min.js')"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" onload="window.firestoreLoaded = true" onerror="window.firestoreLoaded = false; loadFirebaseFallback('firebase-firestore-compat-10.12.5.min.js')"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" onload="window.authLoaded = true" onerror="window.authLoaded = false; loadFirebaseFallback('firebase-auth-compat-10.12.5.min.js')"></script>
+<script>
+window.onload = function() {
+if (!window.firebaseLoaded || !window.firestoreLoaded || !window.authLoaded) {
+  console.error('One or more Firebase SDKs failed to load from CDN.');
+  document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 네트워크를 확인하거나 나중에 다시 시도해주세요.</div>';
+  return;
+}
+initializeFirebase();
 };
 </script>
 <style>
