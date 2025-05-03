@@ -35,7 +35,7 @@ var App = function () {
   var isCollapsedState = useState(false);
   var isCollapsed = isCollapsedState[0];
   var setIsCollapsed = isCollapsedState[1];
-  var isSoundOnState = useState(true);
+  var isSoundOnState = useState(false);
   var isSoundOn = isSoundOnState[0];
   var setIsSoundOn = isSoundOnState[1];
   var scrollRef = useRef(null);
@@ -90,7 +90,7 @@ var App = function () {
     if (isSoundOn) {
       bgmElement.play().catch(function (e) {
         console.error('BGM 재생 실패:', e);
-        setError('BGM 재생에 실패했습니다: ' + e.message);
+        setError('BGM 재생에 실패했습니다: 브라우저 정책에 의해 차단되었거나 파일을 로드할 수 없습니다. (' + e.message + ')');
       });
     } else {
       bgmElement.pause();
@@ -631,7 +631,9 @@ var App = function () {
         lineHeight: lineHeight + 'rem'
       }
     }, verse.krvText, " (\uAC1C\uC5ED\uAC1C\uC815)"));
-  })) : /*#__PURE__*/React.createElement("p", null, "\uAD6C\uC808\uC744 \uCD94\uAC00\uD558\uC138\uC694.")));
+  })) : /*#__PURE__*/React.createElement("p", null, "\uAD6C\uC808\uC744 \uCD94\uAC00\uD558\uC138\uC694.")), /*#__PURE__*/React.createElement("audio", {
+    id: "bgm"
+  }));
 };
 ReactDOM.render(/*#__PURE__*/React.createElement(App, null), document.getElementById('root'));
 console.log('App rendered successfully.');
