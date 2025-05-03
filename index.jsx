@@ -94,6 +94,13 @@ var App = function() {
   var signupPasswordState = useState('');
   var signupPassword = signupPasswordState[0];
   var setSignupPassword = signupPasswordState[1];
+  // 팝업 상태
+  var showAuthPopupState = useState(false);
+  var showAuthPopup = showAuthPopupState[0];
+  var setShowAuthPopup = showAuthPopupState[1];
+  var authTabState = useState('login'); // 'login' 또는 'signup'
+  var authTab = authTabState[0];
+  var setAuthTab = authTabState[1];
 
   // 공유된 구절 상태
   var sharedVersesState = useState([]);
@@ -301,6 +308,7 @@ var App = function() {
         setError('회원가입이 완료되었습니다. 로그인해주세요.');
         setSignupUsername('');
         setSignupPassword('');
+        setShowAuthPopup(false);
       })
       .catch(function(error) {
         console.error('Signup error:', error);
@@ -322,6 +330,7 @@ var App = function() {
         setError('');
         setUsername('');
         setPassword('');
+        setShowAuthPopup(false);
       })
       .catch(function(error) {
         console.error('Login error:', error);
@@ -680,54 +689,94 @@ var App = function() {
     <div className="container" style={{ maxWidth: containerWidth + 'px' }}>
       <div className="title-bar">
         <h1 className="title">j2w_2027 Bible Infinite Scroll</h1>
-        <button
-          onClick={function() { setIsCollapsed(!isCollapsed); }}
-          className="toggle-button"
-        >
-          {isCollapsed ? '▼' : '▲'}
-        </button>
+        <div>
+          <button
+            onClick={function() { setIsCollapsed(!isCollapsed); }}
+            className="toggle-button"
+          >
+            {isCollapsed ? '▼' : '▲'}
+          </button>
+          <button
+            onClick={function() { setShowAuthPopup(true); }}
+            className="user-icon"
+          >
+            👤
+          </button>
+        </div>
       </div>
-      {!user && (
-        <div className="mb-4">
-          <h2 className="subtitle">로그인</h2>
-          <input
-            type="email"
-            value={username}
-            onChange={function(e) { setUsername(e.target.value); }}
-            placeholder="이메일 (예: user@example.com)"
-            className="input"
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={function(e) { setPassword(e.target.value); }}
-            placeholder="비밀번호"
-            className="input"
-          />
-          <button onClick={login} className="button">로그인</button>
-          <h2 className="subtitle">회원가입</h2>
-          <input
-            type="email"
-            value={signupUsername}
-            onChange={function(e) { setSignupUsername(e.target.value); }}
-            placeholder="이메일 (예: user@example.com)"
-            className="input"
-          />
-          <input
-            type="password"
-            value={signupPassword}
-            onChange={function(e) { setSignupPassword(e.target.value); }}
-            placeholder="비밀번호"
-            className="input"
-          />
-          <button onClick={signup} className="button">회원가입</button>
-        </div>
-      )}
-      {user && (
-        <div className="mb-4">
-          <p>환영합니다, {user.email}님!</p>
-          <button onClick={logout} className="button">로그아웃</button>
-        </div>
+      {showAuthPopup && (
+        <>
+          <div className="auth-popup-overlay" onClick={function() { setShowAuthPopup(false); }}></div>
+          <div className="auth-popup">
+            <button
+              onClick={function() { setShowAuthPopup(false); }}
+              className="auth-popup-close"
+            >
+              ×
+            </button>
+            {user ? (
+              <div>
+                <p>환영합니다, {user.email}님!</p>
+                <button onClick={logout} className="button">로그아웃</button>
+              </div>
+            ) : (
+              <>
+                <div className="auth-tabs">
+                  <button
+                    className={`auth-tab ${authTab === 'login' ? 'active' : ''}`}
+                    onClick={function() { setAuthTab('login'); setError(''); }}
+                  >
+                    로그인
+                  </button>
+                  <button
+                    className={`auth-tab ${authTab === 'signup' ? 'active' : ''}`}
+                    onClick={function() { setAuthTab('signup'); setError(''); }}
+                  >
+                    회원가입
+                  </button>
+                </div>
+                {authTab === 'login' && (
+                  <div>
+                    <input
+                      type="email"
+                      value={username}
+                      onChange={function(e) { setUsername(e.target.value); }}
+                      placeholder="이메일 (예: user@example.com)"
+                      className="input"
+                    />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={function(e) { setPassword(e.target.value); }}
+                      placeholder="비밀번호"
+                      className="input"
+                    />
+                    <button onClick={login} className="button">로그인</button>
+                  </div>
+                )}
+                {authTab === 'signup' && (
+                  <div>
+                    <input
+                      type="email"
+                      value={signupUsername}
+                      onChange={function(e) { setSignupUsername(e.target.value); }}
+                      placeholder="이메일 (예: user@example.com)"
+                      className="input"
+                    />
+                    <input
+                      type="password"
+                      value={signupPassword}
+                      onChange={function(e) { setSignupPassword(e.target.value); }}
+                      placeholder="비밀번호 (8자 이상)"
+                      className="input"
+                    />
+                    <button onClick={signup} className="button">회원가입</button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </>
       )}
       {!isCollapsed && (
         <div>

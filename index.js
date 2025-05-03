@@ -93,6 +93,13 @@ var App = function () {
   var signupPasswordState = useState('');
   var signupPassword = signupPasswordState[0];
   var setSignupPassword = signupPasswordState[1];
+  // 팝업 상태
+  var showAuthPopupState = useState(false);
+  var showAuthPopup = showAuthPopupState[0];
+  var setShowAuthPopup = showAuthPopupState[1];
+  var authTabState = useState('login'); // 'login' 또는 'signup'
+  var authTab = authTabState[0];
+  var setAuthTab = authTabState[1];
 
   // 공유된 구절 상태
   var sharedVersesState = useState([]);
@@ -298,6 +305,7 @@ var App = function () {
       setError('회원가입이 완료되었습니다. 로그인해주세요.');
       setSignupUsername('');
       setSignupPassword('');
+      setShowAuthPopup(false);
     }).catch(function (error) {
       console.error('Signup error:', error);
       setError('회원가입 실패: ' + error.message);
@@ -316,6 +324,7 @@ var App = function () {
       setError('');
       setUsername('');
       setPassword('');
+      setShowAuthPopup(false);
     }).catch(function (error) {
       console.error('Login error:', error);
       setError('로그인 실패: ' + error.message);
@@ -668,16 +677,46 @@ var App = function () {
     className: "title-bar"
   }, /*#__PURE__*/React.createElement("h1", {
     className: "title"
-  }, "j2w_2027 Bible Infinite Scroll"), /*#__PURE__*/React.createElement("button", {
+  }, "j2w_2027 Bible Infinite Scroll"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setIsCollapsed(!isCollapsed);
     },
     className: "toggle-button"
-  }, isCollapsed ? '▼' : '▲')), !user && /*#__PURE__*/React.createElement("div", {
-    className: "mb-4"
-  }, /*#__PURE__*/React.createElement("h2", {
-    className: "subtitle"
-  }, "\uB85C\uADF8\uC778"), /*#__PURE__*/React.createElement("input", {
+  }, isCollapsed ? '▼' : '▲'), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowAuthPopup(true);
+    },
+    className: "user-icon"
+  }, "\uD83D\uDC64"))), showAuthPopup && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "auth-popup-overlay",
+    onClick: function () {
+      setShowAuthPopup(false);
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "auth-popup"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowAuthPopup(false);
+    },
+    className: "auth-popup-close"
+  }, "\xD7"), user ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", null, "\uD658\uC601\uD569\uB2C8\uB2E4, ", user.email, "\uB2D8!"), /*#__PURE__*/React.createElement("button", {
+    onClick: logout,
+    className: "button"
+  }, "\uB85C\uADF8\uC544\uC6C3")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "auth-tabs"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: `auth-tab ${authTab === 'login' ? 'active' : ''}`,
+    onClick: function () {
+      setAuthTab('login');
+      setError('');
+    }
+  }, "\uB85C\uADF8\uC778"), /*#__PURE__*/React.createElement("button", {
+    className: `auth-tab ${authTab === 'signup' ? 'active' : ''}`,
+    onClick: function () {
+      setAuthTab('signup');
+      setError('');
+    }
+  }, "\uD68C\uC6D0\uAC00\uC785")), authTab === 'login' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
     type: "email",
     value: username,
     onChange: function (e) {
@@ -696,9 +735,7 @@ var App = function () {
   }), /*#__PURE__*/React.createElement("button", {
     onClick: login,
     className: "button"
-  }, "\uB85C\uADF8\uC778"), /*#__PURE__*/React.createElement("h2", {
-    className: "subtitle"
-  }, "\uD68C\uC6D0\uAC00\uC785"), /*#__PURE__*/React.createElement("input", {
+  }, "\uB85C\uADF8\uC778")), authTab === 'signup' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
     type: "email",
     value: signupUsername,
     onChange: function (e) {
@@ -712,17 +749,12 @@ var App = function () {
     onChange: function (e) {
       setSignupPassword(e.target.value);
     },
-    placeholder: "\uBE44\uBC00\uBC88\uD638",
+    placeholder: "\uBE44\uBC00\uBC88\uD638 (8\uC790 \uC774\uC0C1)",
     className: "input"
   }), /*#__PURE__*/React.createElement("button", {
     onClick: signup,
     className: "button"
-  }, "\uD68C\uC6D0\uAC00\uC785")), user && /*#__PURE__*/React.createElement("div", {
-    className: "mb-4"
-  }, /*#__PURE__*/React.createElement("p", null, "\uD658\uC601\uD569\uB2C8\uB2E4, ", user.email, "\uB2D8!"), /*#__PURE__*/React.createElement("button", {
-    onClick: logout,
-    className: "button"
-  }, "\uB85C\uADF8\uC544\uC6C3")), !isCollapsed && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, "\uD68C\uC6D0\uAC00\uC785"))))), !isCollapsed && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "mb-4"
   }, /*#__PURE__*/React.createElement("input", {
     type: "text",
