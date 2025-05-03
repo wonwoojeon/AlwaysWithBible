@@ -3,8 +3,16 @@ var useEffect = React.useEffect;
 var useRef = React.useRef;
 
 // Firebase Firestore 및 Auth 초기화
-var db = firebase.firestore();
-var auth = firebase.auth();
+var db, auth;
+try {
+  if (typeof firebase === 'undefined') {
+    throw new Error('Firebase is not defined');
+  }
+  db = firebase.firestore();
+  auth = firebase.auth();
+} catch (e) {
+  console.error('Firebase initialization failed:', e.message);
+}
 var App = function () {
   // 기존 상태
   var versesState = useState([]);
@@ -91,8 +99,17 @@ var App = function () {
   var sharedVerses = sharedVersesState[0];
   var setSharedVerses = sharedVersesState[1];
 
+  // Firebase 초기화 확인
+  useEffect(function () {
+    if (!db || !auth) {
+      setError('Firebase 초기화에 실패했습니다. 새로고침 후 다시 시도해주세요.');
+      return;
+    }
+  }, []);
+
   // 사용자 인증 상태 감지
   useEffect(function () {
+    if (!auth) return;
     var unsubscribe = auth.onAuthStateChanged(function (firebaseUser) {
       setUser(firebaseUser);
       if (!firebaseUser) {
@@ -134,7 +151,6 @@ var App = function () {
     var bgmElement = document.getElementById('bgm');
     if (!bgmElement || !currentBgm) return;
     bgmElement.src = currentBgm;
-    // loop 속성이 추가되었으므로 onended 이벤트 제거
     if (isBgmOn) {
       bgmElement.play().catch(function (e) {
         console.error('BGM 재생 실패:', e);
@@ -158,27 +174,33 @@ var App = function () {
     });
   }, []);
 
-  // 로그인 상태에 따라 구절 로드
+  // 로그인 상태에 따라 구절 로드 (실시간 업데이트)
   useEffect(function () {
-    if (!user) return;
+    if (!db || !user) return;
     var userId = user.uid;
-    console.log('Loading verses for user:', userId);
+    console.log('Subscribing to verses for user:', userId);
     var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
-    versesRef.get().then(function (doc) {
+    var unsubscribe = versesRef.onSnapshot(function (doc) {
       if (doc.exists) {
         var savedVerses = doc.data().verses || [];
         setVerses(savedVerses);
         console.log('Verses loaded from Firestore:', savedVerses);
+      } else {
+        console.log('No verses found for user, initializing empty array');
+        setVerses([]);
       }
-    }).catch(function (e) {
+    }, function (e) {
       console.error('Failed to load verses from Firestore:', e);
       setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
     });
+    return function () {
+      unsubscribe();
+    };
   }, [user]);
 
   // 구절 저장 (로그인 상태일 때만)
   useEffect(function () {
-    if (!user) return;
+    if (!db || !user) return;
     var userId = user.uid;
     console.log('Saving verses for user:', userId, verses);
     var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
@@ -190,10 +212,11 @@ var App = function () {
     });
   }, [verses, user]);
 
-  // 공유된 구절 로드
+  // 공유된 구절 로드 (실시간 업데이트)
   useEffect(function () {
+    if (!db) return;
     var sharedRef = db.collection('shared_verses');
-    sharedRef.get().then(function (querySnapshot) {
+    var unsubscribe = sharedRef.onSnapshot(function (querySnapshot) {
       var shared = [];
       querySnapshot.forEach(function (doc) {
         shared.push({
@@ -203,10 +226,13 @@ var App = function () {
       });
       setSharedVerses(shared);
       console.log('Shared verses loaded:', shared);
-    }).catch(function (e) {
+    }, function (e) {
       console.error('Failed to load shared verses:', e);
       setError('공유된 구절을 불러오지 못했습니다: ' + e.message);
     });
+    return function () {
+      unsubscribe();
+    };
   }, []);
   useEffect(function () {
     console.log('Starting auto-scroll with speed:', scrollSpeed);
@@ -256,8 +282,16 @@ var App = function () {
     setVerses(updatedVerses);
   };
   var signup = function () {
+    if (!auth) {
+      setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
+      return;
+    }
     if (!signupUsername || !signupPassword) {
       setError('이메일과 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+    if (signupPassword.length < 8) {
+      setError('비밀번호는 최소 8자 이상이어야 합니다.');
       return;
     }
     auth.createUserWithEmailAndPassword(signupUsername, signupPassword).then(function (userCredential) {
@@ -270,6 +304,10 @@ var App = function () {
     });
   };
   var login = function () {
+    if (!auth) {
+      setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
+      return;
+    }
     if (!username || !password) {
       setError('이메일과 비밀번호를 모두 입력해주세요.');
       return;
@@ -284,6 +322,10 @@ var App = function () {
     });
   };
   var logout = function () {
+    if (!auth) {
+      setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
+      return;
+    }
     auth.signOut().then(function () {
       setUser(null);
       setVerses([]);
@@ -294,6 +336,10 @@ var App = function () {
     });
   };
   var shareVerse = function (verse) {
+    if (!db) {
+      setError('Firebase 데이터베이스 서비스가 초기화되지 않았습니다.');
+      return;
+    }
     if (!user) {
       setError('로그인 후 구절을 공유할 수 있습니다.');
       return;
@@ -305,17 +351,6 @@ var App = function () {
       sharedAt: firebase.firestore.FieldValue.serverTimestamp()
     }).then(function () {
       setError('구절이 공유되었습니다.');
-      // 공유된 구절 목록 갱신
-      db.collection('shared_verses').get().then(function (querySnapshot) {
-        var shared = [];
-        querySnapshot.forEach(function (doc) {
-          shared.push({
-            id: doc.id,
-            ...doc.data()
-          });
-        });
-        setSharedVerses(shared);
-      });
     }).catch(function (e) {
       console.error('Failed to share verse:', e);
       setError('구절 공유 실패: ' + e.message);
@@ -435,7 +470,7 @@ var App = function () {
           var url = 'https://bible-api.com/' + encodeURIComponent(formattedQuery) + '?translation=kjv';
           console.log('KJV API URL:', url);
           var kjvResponse = await fetch(url);
-          if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status + ' ' + kjvResponse.statusText);
+          if (!kjvResponse.ok) throw new Error(`KJV API 요청 실패: ${kjvResponse.status} ${kjvResponse.statusText}`);
           var kjvData = await kjvResponse.json();
           console.log('KJV API response:', kjvData);
           if (kjvData.error) throw new Error(kjvData.error);

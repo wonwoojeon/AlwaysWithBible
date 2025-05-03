@@ -2,7 +2,20 @@ var useState = React.useState;
 var useEffect = React.useEffect;
 var useRef = React.useRef;
 
+// Firebase Firestore 및 Auth 초기화
+var db, auth;
+try {
+  if (typeof firebase === 'undefined') {
+    throw new Error('Firebase is not defined');
+  }
+  db = firebase.firestore();
+  auth = firebase.auth();
+} catch (e) {
+  console.error('Firebase initialization failed:', e.message);
+}
+
 var App = function() {
+  // 기존 상태
   var versesState = useState([]);
   var verses = versesState[0];
   var setVerses = versesState[1];
@@ -36,9 +49,6 @@ var App = function() {
   var isCollapsedState = useState(false);
   var isCollapsed = isCollapsedState[0];
   var setIsCollapsed = isCollapsedState[1];
-  var isSoundOnState = useState(false);
-  var isSoundOn = isSoundOnState[0];
-  var setIsSoundOn = isSoundOnState[1];
   var scrollRef = useRef(null);
   var scrollPosState = useState(0);
   var scrollPos = scrollPosState[0];
@@ -46,6 +56,7 @@ var App = function() {
   var koreanDataState = useState(null);
   var koreanData = koreanDataState[0];
   var setKoreanData = koreanDataState[1];
+  
   // BGM 관련 상태
   var bgmListState = useState([]);
   var bgmList = bgmListState[0];
@@ -53,6 +64,61 @@ var App = function() {
   var currentBgmState = useState(null);
   var currentBgm = currentBgmState[0];
   var setCurrentBgm = currentBgmState[1];
+  
+  // BGM과 음성 소리 분리
+  var isBgmOnState = useState(false);
+  var isBgmOn = isBgmOnState[0];
+  var setIsBgmOn = isBgmOnState[1];
+  var isVoiceOnState = useState(true);
+  var isVoiceOn = isVoiceOnState[0];
+  var setIsVoiceOn = isVoiceOnState[1];
+  
+  // 음성 소리 볼륨 상태
+  var speechVolumeState = useState(1.0);
+  var speechVolume = speechVolumeState[0];
+  var setSpeechVolume = speechVolumeState[1];
+  
+  // 로그인 및 회원가입 상태
+  var userState = useState(null);
+  var user = userState[0];
+  var setUser = userState[1];
+  var usernameState = useState('');
+  var username = usernameState[0];
+  var setUsername = usernameState[1];
+  var passwordState = useState('');
+  var password = passwordState[0];
+  var setPassword = passwordState[1];
+  var signupUsernameState = useState('');
+  var signupUsername = signupUsernameState[0];
+  var setSignupUsername = signupUsernameState[1];
+  var signupPasswordState = useState('');
+  var signupPassword = signupPasswordState[0];
+  var setSignupPassword = signupPasswordState[1];
+
+  // 공유된 구절 상태
+  var sharedVersesState = useState([]);
+  var sharedVerses = sharedVersesState[0];
+  var setSharedVerses = sharedVersesState[1];
+
+  // Firebase 초기화 확인
+  useEffect(function() {
+    if (!db || !auth) {
+      setError('Firebase 초기화에 실패했습니다. 새로고침 후 다시 시도해주세요.');
+      return;
+    }
+  }, []);
+
+  // 사용자 인증 상태 감지
+  useEffect(function() {
+    if (!auth) return;
+    var unsubscribe = auth.onAuthStateChanged(function(firebaseUser) {
+      setUser(firebaseUser);
+      if (!firebaseUser) {
+        setVerses([]);
+      }
+    });
+    return function() { unsubscribe(); };
+  }, []);
 
   // 글자 크기 변경 시 줄간격 초기값 동기화
   useEffect(function() {
@@ -88,12 +154,7 @@ var App = function() {
     if (!bgmElement || !currentBgm) return;
 
     bgmElement.src = currentBgm;
-    bgmElement.onended = function() {
-      var randomIndex = Math.floor(Math.random() * bgmList.length);
-      setCurrentBgm(bgmList[randomIndex]);
-    };
-
-    if (isSoundOn) {
+    if (isBgmOn) {
       bgmElement.play().catch(function(e) {
         console.error('BGM 재생 실패:', e);
         setError('BGM 재생에 실패했습니다: 브라우저 정책에 의해 차단되었거나 파일을 로드할 수 없습니다. (' + e.message + ')');
@@ -101,7 +162,7 @@ var App = function() {
     } else {
       bgmElement.pause();
     }
-  }, [isSoundOn, currentBgm, bgmList]);
+  }, [isBgmOn, currentBgm, bgmList]);
 
   useEffect(function() {
     console.log('Fetching ko_rev.json...');
@@ -120,29 +181,57 @@ var App = function() {
       });
   }, []);
 
+  // 로그인 상태에 따라 구절 로드 (실시간 업데이트)
   useEffect(function() {
-    console.log('Loading verses from localStorage...');
-    var saved = localStorage.getItem('verses');
-    if (saved) {
-      try {
-        setVerses(JSON.parse(saved));
-        console.log('Verses loaded from localStorage:', saved);
-      } catch (e) {
-        console.error('Failed to parse verses from localStorage:', e);
-        setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
+    if (!db || !user) return;
+    var userId = user.uid;
+    console.log('Subscribing to verses for user:', userId);
+    var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
+    var unsubscribe = versesRef.onSnapshot(function(doc) {
+      if (doc.exists) {
+        var savedVerses = doc.data().verses || [];
+        setVerses(savedVerses);
+        console.log('Verses loaded from Firestore:', savedVerses);
+      } else {
+        console.log('No verses found for user, initializing empty array');
+        setVerses([]);
       }
-    }
-  }, []);
+    }, function(e) {
+      console.error('Failed to load verses from Firestore:', e);
+      setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
+    });
+    return function() { unsubscribe(); };
+  }, [user]);
 
+  // 구절 저장 (로그인 상태일 때만)
   useEffect(function() {
-    console.log('Saving verses to localStorage:', verses);
-    try {
-      localStorage.setItem('verses', JSON.stringify(verses));
-    } catch (e) {
-      console.error('Failed to save verses to localStorage:', e);
+    if (!db || !user) return;
+    var userId = user.uid;
+    console.log('Saving verses for user:', userId, verses);
+    var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
+    versesRef.set({ verses: verses }).catch(function(e) {
+      console.error('Failed to save verses to Firestore:', e);
       setError('구절을 저장하지 못했습니다: ' + e.message);
-    }
-  }, [verses]);
+    });
+  }, [verses, user]);
+
+  // 공유된 구절 로드 (실시간 업데이트)
+  useEffect(function() {
+    if (!db) return;
+    var sharedRef = db.collection('shared_verses');
+    var unsubscribe = sharedRef.onSnapshot(function(querySnapshot) {
+      var shared = [];
+      querySnapshot.forEach(function(doc) {
+        shared.push({ id: doc.id, ...doc.data() });
+      });
+      setSharedVerses(shared);
+      console.log('Shared verses loaded:', shared);
+    }, function(e) {
+      console.error('Failed to load shared verses:', e);
+      setError('공유된 구절을 불러오지 못했습니다: ' + e.message);
+    });
+    return function() { unsubscribe(); };
+  }, []);
 
   useEffect(function() {
     console.log('Starting auto-scroll with speed:', scrollSpeed);
@@ -177,20 +266,108 @@ var App = function() {
 
   var animationDuration = verses.length > 0 ? 10 + verses.length * 2 : 10;
 
-  var toggleSound = function() {
-    if (isSoundOn) {
+  var toggleBgm = function() {
+    setIsBgmOn(!isBgmOn);
+  };
+
+  var toggleVoice = function() {
+    if (isVoiceOn) {
       window.speechSynthesis.cancel();
-      // BGM 일시정지는 useEffect에서 처리
-    } else {
-      // BGM 재생은 useEffect에서 처리
     }
-    setIsSoundOn(!isSoundOn);
+    setIsVoiceOn(!isVoiceOn);
   };
 
   var deleteVerse = function(index) {
     console.log('Deleting verse at index:', index);
     var updatedVerses = verses.filter(function(_, i) { return i !== index; });
     setVerses(updatedVerses);
+  };
+
+  var signup = function() {
+    if (!auth) {
+      setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
+      return;
+    }
+    if (!signupUsername || !signupPassword) {
+      setError('이메일과 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+    if (signupPassword.length < 8) {
+      setError('비밀번호는 최소 8자 이상이어야 합니다.');
+      return;
+    }
+    auth.createUserWithEmailAndPassword(signupUsername, signupPassword)
+      .then(function(userCredential) {
+        setError('회원가입이 완료되었습니다. 로그인해주세요.');
+        setSignupUsername('');
+        setSignupPassword('');
+      })
+      .catch(function(error) {
+        console.error('Signup error:', error);
+        setError('회원가입 실패: ' + error.message);
+      });
+  };
+
+  var login = function() {
+    if (!auth) {
+      setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
+      return;
+    }
+    if (!username || !password) {
+      setError('이메일과 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+    auth.signInWithEmailAndPassword(username, password)
+      .then(function(userCredential) {
+        setError('');
+        setUsername('');
+        setPassword('');
+      })
+      .catch(function(error) {
+        console.error('Login error:', error);
+        setError('로그인 실패: ' + error.message);
+      });
+  };
+
+  var logout = function() {
+    if (!auth) {
+      setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
+      return;
+    }
+    auth.signOut().then(function() {
+      setUser(null);
+      setVerses([]);
+      setError('');
+    }).catch(function(error) {
+      console.error('Logout error:', error);
+      setError('로그아웃 실패: ' + error.message);
+    });
+  };
+
+  var shareVerse = function(verse) {
+    if (!db) {
+      setError('Firebase 데이터베이스 서비스가 초기화되지 않았습니다.');
+      return;
+    }
+    if (!user) {
+      setError('로그인 후 구절을 공유할 수 있습니다.');
+      return;
+    }
+    var sharedRef = db.collection('shared_verses').doc();
+    sharedRef.set({
+      verse: verse,
+      sharedBy: user.email,
+      sharedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function() {
+      setError('구절이 공유되었습니다.');
+    }).catch(function(e) {
+      console.error('Failed to share verse:', e);
+      setError('구절 공유 실패: ' + e.message);
+    });
+  };
+
+  var addSharedVerse = function(sharedVerse) {
+    setVerses(verses.concat([sharedVerse.verse]));
   };
 
   var searchVerses = async function() {
@@ -304,7 +481,7 @@ var App = function() {
           var url = 'https://bible-api.com/' + encodeURIComponent(formattedQuery) + '?translation=kjv';
           console.log('KJV API URL:', url);
           var kjvResponse = await fetch(url);
-          if (!kjvResponse.ok) throw new Error('KJV API 요청 실패: ' + kjvResponse.status + ' ' + kjvResponse.statusText);
+          if (!kjvResponse.ok) throw new Error(`KJV API 요청 실패: ${kjvResponse.status} ${kjvResponse.statusText}`);
           var kjvData = await kjvResponse.json();
           console.log('KJV API response:', kjvData);
           if (kjvData.error) throw new Error(kjvData.error);
@@ -381,15 +558,17 @@ var App = function() {
     setVerses(verses.concat([verse]));
     var updatedResults = searchResults.filter(function(_, i) { return i !== index; });
     setSearchResults(updatedResults);
-    if (isSoundOn) {
+    if (isVoiceOn) {
       var utterance = new SpeechSynthesisUtterance(verse.kjvText);
       utterance.lang = 'en-US';
       utterance.rate = speechRate;
+      utterance.volume = speechVolume;
       window.speechSynthesis.speak(utterance);
 
       var krUtterance = new SpeechSynthesisUtterance(verse.krvText);
       krUtterance.lang = 'ko-KR';
       krUtterance.rate = speechRate;
+      krUtterance.volume = speechVolume;
       window.speechSynthesis.speak(krUtterance);
     }
   };
@@ -500,7 +679,7 @@ var App = function() {
   return (
     <div className="container" style={{ maxWidth: containerWidth + 'px' }}>
       <div className="title-bar">
-        <h1 className="title">J2W 2027 Bible Infinite Scroll</h1>
+        <h1 className="title">j2w_2027 Bible Infinite Scroll</h1>
         <button
           onClick={function() { setIsCollapsed(!isCollapsed); }}
           className="toggle-button"
@@ -508,6 +687,48 @@ var App = function() {
           {isCollapsed ? '▼' : '▲'}
         </button>
       </div>
+      {!user && (
+        <div className="mb-4">
+          <h2 className="subtitle">로그인</h2>
+          <input
+            type="email"
+            value={username}
+            onChange={function(e) { setUsername(e.target.value); }}
+            placeholder="이메일 (예: user@example.com)"
+            className="input"
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={function(e) { setPassword(e.target.value); }}
+            placeholder="비밀번호"
+            className="input"
+          />
+          <button onClick={login} className="button">로그인</button>
+          <h2 className="subtitle">회원가입</h2>
+          <input
+            type="email"
+            value={signupUsername}
+            onChange={function(e) { setSignupUsername(e.target.value); }}
+            placeholder="이메일 (예: user@example.com)"
+            className="input"
+          />
+          <input
+            type="password"
+            value={signupPassword}
+            onChange={function(e) { setSignupPassword(e.target.value); }}
+            placeholder="비밀번호"
+            className="input"
+          />
+          <button onClick={signup} className="button">회원가입</button>
+        </div>
+      )}
+      {user && (
+        <div className="mb-4">
+          <p>환영합니다, {user.email}님!</p>
+          <button onClick={logout} className="button">로그아웃</button>
+        </div>
+      )}
       {!isCollapsed && (
         <div>
           <div className="mb-4">
@@ -543,6 +764,17 @@ var App = function() {
                         >
                           X
                         </button>
+                        {user && (
+                          <button
+                            onClick={function(e) {
+                              e.stopPropagation();
+                              shareVerse(verse);
+                            }}
+                            className="share-button"
+                          >
+                            공유
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -599,11 +831,29 @@ var App = function() {
               className="slider"
             />
           </div>
+          <div className="slider-container">
+            <label className="slider-label">음성 볼륨: {speechVolume.toFixed(1)}</label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={speechVolume}
+              onChange={function(e) { setSpeechVolume(parseFloat(e.target.value)); }}
+              className="slider"
+            />
+          </div>
           <button
-            onClick={toggleSound}
+            onClick={toggleBgm}
             className="sound-button"
           >
-            {isSoundOn ? '🔊 소리 끄기' : '🔇 소리 켜기'}
+            {isBgmOn ? '🎵 BGM 끄기' : '🎶 BGM 켜기'}
+          </button>
+          <button
+            onClick={toggleVoice}
+            className="sound-button"
+          >
+            {isVoiceOn ? '🗣️ 음성 끄기' : '🔈 음성 켜기'}
           </button>
         </div>
       )}
@@ -621,6 +871,26 @@ var App = function() {
                 />
                 <span className="ml-2">{result.query}: {result.kjvText} (KJV)</span>
                 <p className="ml-6">{result.krvText} (개역개정)</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {sharedVerses.length > 0 && (
+        <div className="mb-4">
+          <h2 className="subtitle">공유된 구절</h2>
+          {sharedVerses.map(function(sharedVerse) {
+            return (
+              <div key={sharedVerse.id} className="verse">
+                <button
+                  onClick={function() { addSharedVerse(sharedVerse); }}
+                  className="button"
+                >
+                  추가
+                </button>
+                <span className="ml-2">{sharedVerse.verse.query}: {sharedVerse.verse.kjvText} (KJV)</span>
+                <p className="ml-6">{sharedVerse.verse.krvText} (개역개정)</p>
+                <p className="ml-6">공유자: {sharedVerse.sharedBy}</p>
               </div>
             );
           })}
@@ -652,8 +922,6 @@ var App = function() {
           <p>구절을 추가하세요.</p>
         )}
       </div>
-      {/* 추가: BGM 재생을 위한 <audio> 요소 */}
-      <audio id="bgm" />
     </div>
   );
 };
