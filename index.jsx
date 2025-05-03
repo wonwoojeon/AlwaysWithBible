@@ -27,7 +27,7 @@ var App = function() {
   var fontSizeState = useState(1);
   var fontSize = fontSizeState[0];
   var setFontSize = fontSizeState[1];
-  var lineHeightState = useState(1.5);
+  var lineHeightState = useState(fontSize * 1.2);
   var lineHeight = lineHeightState[0];
   var setLineHeight = lineHeightState[1];
   var containerWidthState = useState(672);
@@ -46,6 +46,62 @@ var App = function() {
   var koreanDataState = useState(null);
   var koreanData = koreanDataState[0];
   var setKoreanData = koreanDataState[1];
+  // BGM 관련 상태
+  var bgmListState = useState([]);
+  var bgmList = bgmListState[0];
+  var setBgmList = bgmListState[1];
+  var currentBgmState = useState(null);
+  var currentBgm = currentBgmState[0];
+  var setCurrentBgm = currentBgmState[1];
+
+  // 글자 크기 변경 시 줄간격 초기값 동기화
+  useEffect(function() {
+    setLineHeight(fontSize * 1.2);
+  }, [fontSize]);
+
+  // BGM 파일 목록 로드
+  useEffect(function() {
+    fetch('/assets/index.json')
+      .then(function(response) {
+        if (!response.ok) throw new Error('Failed to load BGM list');
+        return response.json();
+      })
+      .then(function(data) {
+        var bgmFiles = data.bgmFiles.map(function(file) {
+          return `/assets/${file}`;
+        });
+        setBgmList(bgmFiles);
+        if (bgmFiles.length > 0) {
+          var randomIndex = Math.floor(Math.random() * bgmFiles.length);
+          setCurrentBgm(bgmFiles[randomIndex]);
+        }
+      })
+      .catch(function(err) {
+        console.error('Error loading BGM list:', err.message);
+        setError('BGM 목록을 불러오지 못했습니다: ' + err.message);
+      });
+  }, []);
+
+  // BGM 재생 로직
+  useEffect(function() {
+    var bgmElement = document.getElementById('bgm');
+    if (!bgmElement || !currentBgm) return;
+
+    bgmElement.src = currentBgm;
+    bgmElement.onended = function() {
+      var randomIndex = Math.floor(Math.random() * bgmList.length);
+      setCurrentBgm(bgmList[randomIndex]);
+    };
+
+    if (isSoundOn) {
+      bgmElement.play().catch(function(e) {
+        console.error('BGM 재생 실패:', e);
+        setError('BGM 재생에 실패했습니다: ' + e.message);
+      });
+    } else {
+      bgmElement.pause();
+    }
+  }, [isSoundOn, currentBgm, bgmList]);
 
   useEffect(function() {
     console.log('Fetching ko_rev.json...');
@@ -124,9 +180,9 @@ var App = function() {
   var toggleSound = function() {
     if (isSoundOn) {
       window.speechSynthesis.cancel();
-      document.getElementById('bgm').pause();
+      // BGM 일시정지는 useEffect에서 처리
     } else {
-      document.getElementById('bgm').play();
+      // BGM 재생은 useEffect에서 처리
     }
     setIsSoundOn(!isSoundOn);
   };
@@ -444,7 +500,7 @@ var App = function() {
   return (
     <div className="container" style={{ maxWidth: containerWidth + 'px' }}>
       <div className="title-bar">
-        <h1 className="title">Bible Infinite Scroll</h1>
+        <h1 className="title">J2W 2027 Bible Infinite Scroll</h1>
         <button
           onClick={function() { setIsCollapsed(!isCollapsed); }}
           className="toggle-button"
@@ -512,7 +568,7 @@ var App = function() {
             <input
               type="range"
               min="0.8"
-              max="2"
+              max="4"
               step="0.1"
               value={fontSize}
               onChange={function(e) { setFontSize(parseFloat(e.target.value)); }}
@@ -524,7 +580,7 @@ var App = function() {
             <input
               type="range"
               min="1.2"
-              max="2.0"
+              max="4.0"
               step="0.1"
               value={lineHeight}
               onChange={function(e) { setLineHeight(parseFloat(e.target.value)); }}
@@ -552,19 +608,19 @@ var App = function() {
         </div>
       )}
       {loading && <p className="loading">검색 중...</p>}
-      {error && <div class="error">{error}</div>}
+      {error && <div className="error">{error}</div>}
       {searchResults.length > 0 && (
-        <div class="mb-4">
-          <h2 class="subtitle">검색 결과</h2>
+        <div className="mb-4">
+          <h2 className="subtitle">검색 결과</h2>
           {searchResults.map(function(result, idx) {
             return (
-              <div key={result.query} class="verse">
+              <div key={result.query} className="verse">
                 <input
                   type="checkbox"
                   onChange={function() { addVerses(result, idx); }}
                 />
-                <span class="ml-2">{result.query}: {result.kjvText} (KJV)</span>
-                <p class="ml-6">{result.krvText} (개역개정)</p>
+                <span className="ml-2">{result.query}: {result.kjvText} (KJV)</span>
+                <p className="ml-6">{result.krvText} (개역개정)</p>
               </div>
             );
           })}
@@ -572,20 +628,20 @@ var App = function() {
       )}
       <div
         ref={scrollRef}
-        class="scroll-area"
+        className="scroll-area"
         style={{
           height: isCollapsed ? 'calc(100vh - 60px)' : '70vh'
         }}
       >
         {verses.length > 0 ? (
-          <div class="scroll-content">
+          <div className="scroll-content">
             {[...Array(100)].map(function(_, idx) {
               var verse = verses[idx % verses.length];
               var headers = formatVerseHeader(verse.query);
               return (
-                <div key={idx} class="verse">
-                  <div class="verse-header">{headers.korHeader}</div>
-                  <div class="verse-header">{headers.engHeader}</div>
+                <div key={idx} className="verse">
+                  <div className="verse-header">{headers.korHeader}</div>
+                  <div className="verse-header">{headers.engHeader}</div>
                   <p style={{ fontSize: fontSize + 'rem', lineHeight: lineHeight + 'rem' }}>{verse.kjvText} (KJV)</p>
                   <p style={{ fontSize: fontSize + 'rem', lineHeight: lineHeight + 'rem' }}>{verse.krvText} (개역개정)</p>
                 </div>
