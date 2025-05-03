@@ -152,9 +152,10 @@ var App = function () {
     if (!auth) return;
     var unsubscribe = auth.onAuthStateChanged(function (firebaseUser) {
       setUser(firebaseUser);
-      if (!firebaseUser) {
-        setVerses([]);
-      }
+      // 로그아웃 시 상태 초기화 제거
+      // if (!firebaseUser) {
+      //   setVerses([]);
+      // }
     });
     return function () {
       unsubscribe();
@@ -222,7 +223,10 @@ var App = function () {
 
   // 로그인 상태에 따라 구절 로드 (실시간 업데이트)
   useEffect(function () {
-    if (!db || !user) return;
+    if (!db || !user) {
+      setVerses([]); // user가 없으면 초기화
+      return;
+    }
     var userId = user.uid;
     console.log('Subscribing to verses for user:', userId);
     var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
@@ -234,6 +238,9 @@ var App = function () {
       } else {
         console.log('No verses found for user, initializing empty array');
         setVerses([]);
+        versesRef.set({
+          verses: []
+        }); // 문서가 없으면 초기화
       }
     }, function (e) {
       console.error('Failed to load verses from Firestore:', e);
@@ -252,6 +259,8 @@ var App = function () {
     var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
     versesRef.set({
       verses: verses
+    }, {
+      merge: true
     }).catch(function (e) {
       console.error('Failed to save verses to Firestore:', e);
       setError('구절을 저장하지 못했습니다: ' + e.message);
@@ -378,7 +387,6 @@ var App = function () {
     }
     auth.signOut().then(function () {
       setUser(null);
-      setVerses([]);
       setError('');
     }).catch(function (error) {
       console.error('Logout error:', error);
