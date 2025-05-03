@@ -63,6 +63,9 @@ var App = function () {
   var loadingState = useState(false);
   var loading = loadingState[0];
   var setLoading = loadingState[1];
+  var dataLoadingState = useState(true); // 데이터 로딩 상태 추가
+  var dataLoading = dataLoadingState[0];
+  var setDataLoading = dataLoadingState[1];
   var scrollSpeedState = useState(0.5);
   var scrollSpeed = scrollSpeedState[0];
   var setScrollSpeed = scrollSpeedState[1];
@@ -113,6 +116,9 @@ var App = function () {
   var bgmVolume = bgmVolumeState[0];
   var setBgmVolume = bgmVolumeState[1];
 
+  // 현재 재생 중인 음성 추적
+  var currentUtterancesRef = useRef([]);
+
   // 로그인 및 회원가입 상태
   var userState = useState(null);
   var user = userState[0];
@@ -150,6 +156,7 @@ var App = function () {
     if (!auth) return;
     var unsubscribe = auth.onAuthStateChanged(function (firebaseUser) {
       setUser(firebaseUser);
+      setDataLoading(false); // 인증 상태 확인 후 로딩 해제
     });
     return function () {
       unsubscribe();
@@ -183,12 +190,11 @@ var App = function () {
     });
   }, []);
 
-  // BGM 재생 로직 (볼륨 반영 추가)
+  // BGM 소스 설정 및 재생 로직
   useEffect(function () {
     var bgmElement = document.getElementById('bgm');
     if (!bgmElement || !currentBgm) return;
     bgmElement.src = currentBgm;
-    bgmElement.volume = bgmVolume; // BGM 볼륨 적용
     if (isBgmOn) {
       bgmElement.play().catch(function (e) {
         console.error('BGM 재생 실패:', e);
@@ -197,7 +203,14 @@ var App = function () {
     } else {
       bgmElement.pause();
     }
-  }, [isBgmOn, currentBgm, bgmList, bgmVolume]);
+  }, [isBgmOn, currentBgm, bgmList]);
+
+  // BGM 볼륨 업데이트 로직 분리
+  useEffect(function () {
+    var bgmElement = document.getElementById('bgm');
+    if (!bgmElement) return;
+    bgmElement.volume = bgmVolume;
+  }, [bgmVolume]);
 
   // 한글 성경 데이터 로드
   useEffect(function () {
@@ -218,10 +231,7 @@ var App = function () {
 
   // 로그인 상태에 따라 구절 로드 (실시간 업데이트)
   useEffect(function () {
-    if (!db || !user) {
-      setVerses([]); // user가 없으면 초기화
-      return;
-    }
+    if (!db || !user) return;
     var userId = user.uid;
     console.log('Subscribing to verses for user:', userId);
     var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
@@ -235,11 +245,13 @@ var App = function () {
         setVerses([]);
         versesRef.set({
           verses: []
-        }); // 문서가 없으면 초기화
+        });
       }
+      setDataLoading(false); // 데이터 로드 완료
     }, function (e) {
       console.error('Failed to load verses from Firestore:', e);
       setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
+      setDataLoading(false);
     });
     return function () {
       unsubscribe();
@@ -319,6 +331,16 @@ var App = function () {
     });
   }, [scrollSpeed, fontSize, lineHeight, containerWidth, speechVolume, bgmVolume, user]);
 
+  // 음성 볼륨 변경 시 재생 중인 음성 업데이트
+  useEffect(function () {
+    if (!isVoiceOn || currentUtterancesRef.current.length === 0) return;
+    window.speechSynthesis.cancel();
+    currentUtterancesRef.current.forEach(function (utterance) {
+      utterance.volume = speechVolume;
+      window.speechSynthesis.speak(utterance);
+    });
+  }, [speechVolume, isVoiceOn]);
+
   // 자동 스크롤 로직
   useEffect(function () {
     console.log('Starting auto-scroll with speed:', scrollSpeed);
@@ -357,8 +379,15 @@ var App = function () {
   var toggleVoice = function () {
     if (isVoiceOn) {
       window.speechSynthesis.cancel();
+      currentUtterancesRef.current = [];
     }
     setIsVoiceOn(!isVoiceOn);
+  };
+  var changeBgm = function () {
+    if (bgmList.length === 0) return;
+    var currentIndex = bgmList.indexOf(currentBgm);
+    var nextIndex = (currentIndex + 1) % bgmList.length;
+    setCurrentBgm(bgmList[nextIndex]);
   };
   var deleteVerse = function (index) {
     console.log('Deleting verse at index:', index);
@@ -620,11 +649,13 @@ var App = function () {
       utterance.rate = speechRate;
       utterance.volume = speechVolume;
       window.speechSynthesis.speak(utterance);
+      currentUtterancesRef.current.push(utterance);
       var krUtterance = new SpeechSynthesisUtterance(verse.krvText);
       krUtterance.lang = 'ko-KR';
       krUtterance.rate = speechRate;
       krUtterance.volume = speechVolume;
       window.speechSynthesis.speak(krUtterance);
+      currentUtterancesRef.current.push(krUtterance);
     }
   };
   var formatVerseHeader = function (query) {
@@ -724,6 +755,11 @@ var App = function () {
       engHeader
     };
   };
+  if (dataLoading) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "loading"
+    }, "데이터 로드 중...");
+  }
   return /*#__PURE__*/React.createElement("div", {
     className: "container",
     style: {
@@ -971,7 +1007,10 @@ var App = function () {
   }, isBgmOn ? '🎵 BGM 끄기' : '🎶 BGM 켜기'), /*#__PURE__*/React.createElement("button", {
     onClick: toggleVoice,
     className: "sound-button"
-  }, isVoiceOn ? '🗣️ 음성 끄기' : '🔈 음성 켜기')), loading && /*#__PURE__*/React.createElement("p", {
+  }, isVoiceOn ? '🗣️ 음성 끄기' : '🔈 음성 켜기'), /*#__PURE__*/React.createElement("button", {
+    onClick: changeBgm,
+    className: "sound-button"
+  }, "🎹 BGM 변경")), loading && /*#__PURE__*/React.createElement("p", {
     className: "loading"
   }, "\uAC80\uC0C9 \uC911..."), error && /*#__PURE__*/React.createElement("div", {
     className: "error"
