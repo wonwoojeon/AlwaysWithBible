@@ -161,6 +161,25 @@ var App = function () {
   var debouncedSetSpeechVolume = debounce(setSpeechVolume, 300);
   var debouncedSetBgmVolume = debounce(setBgmVolume, 300);
 
+  // 설정 저장을 위한 디바운싱 (5분 간격)
+  var debouncedSaveSettings = debounce(function () {
+    if (!db || !user) return;
+    var userId = user.uid;
+    console.log('Saving settings for user (debounced):', userId);
+    var settingsRef = db.collection('users').doc(userId).collection('settings').doc('data');
+    settingsRef.set({
+      scrollSpeed: scrollSpeed,
+      fontSize: fontSize,
+      lineHeight: lineHeight,
+      containerWidth: containerWidth,
+      speechVolume: speechVolume,
+      bgmVolume: bgmVolume
+    }, { merge: true }).catch(function (e) {
+      console.error('Failed to save settings to Firestore:', e);
+      setError('설정을 저장하지 못했습니다: ' + e.message);
+    });
+  }, 300000); // 5분 = 300,000ms
+
   // Firebase 초기화 확인
   useEffect(function () {
     if (!db || !auth) {
@@ -178,6 +197,7 @@ var App = function () {
       setUser(firebaseUser);
       if (!firebaseUser) {
         setDataLoading(false); // 사용자가 없으면 로딩 종료
+        setVerses([]); // 로그아웃 시 구절 초기화
       }
     });
     return function () {
@@ -255,6 +275,7 @@ var App = function () {
   // 로그인 상태에 따라 구절 로드 (실시간 업데이트)
   useEffect(function () {
     if (!db || !user) return;
+    setDataLoading(true); // 데이터 로드 시작 시 로딩
     var userId = user.uid;
     console.log('Subscribing to verses for user:', userId);
     var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
@@ -315,7 +336,7 @@ var App = function () {
     };
   }, [user]);
 
-  // 구절 저장 (로그인 상태일 때만)
+  // 구절 저장 (즉시 저장)
   useEffect(function () {
     if (!db || !user) return;
     var userId = user.uid;
@@ -329,23 +350,10 @@ var App = function () {
     });
   }, [verses, user]);
 
-  // 사용자 설정 저장 (Firestore에 설정 저장)
+  // 사용자 설정 저장 (5분 간격 디바운싱)
   useEffect(function () {
     if (!db || !user) return;
-    var userId = user.uid;
-    console.log('Saving settings for user:', userId);
-    var settingsRef = db.collection('users').doc(userId).collection('settings').doc('data');
-    settingsRef.set({
-      scrollSpeed: scrollSpeed,
-      fontSize: fontSize,
-      lineHeight: lineHeight,
-      containerWidth: containerWidth,
-      speechVolume: speechVolume,
-      bgmVolume: bgmVolume
-    }, { merge: true }).catch(function (e) {
-      console.error('Failed to save settings to Firestore:', e);
-      setError('설정을 저장하지 못했습니다: ' + e.message);
-    });
+    debouncedSaveSettings();
   }, [scrollSpeed, fontSize, lineHeight, containerWidth, speechVolume, bgmVolume, user]);
 
   // 음성 볼륨 변경 시 재생 중인 음성 업데이트
