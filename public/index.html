@@ -11,23 +11,15 @@
         var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
         var firstSheetName = workbook.SheetNames[0];
         var worksheet = workbook.Sheets[firstSheetName];
-
-        // Convert sheet to JSON to filter blank rows
         var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-        // Filter out blank rows (rows where all cells are empty, null, or undefined)
         var filteredData = jsonData.filter(row => row.some(filledCell));
-
-        // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
         var headerRowIndex = filteredData.findIndex((row, index) =>
           row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
         );
-        // Fallback
         if (headerRowIndex === -1 || headerRowIndex > 25) {
           headerRowIndex = 0;
         }
-
-        // Convert filtered JSON back to CSV
-        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
         csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
         return csv;
       } catch (e) {
@@ -47,72 +39,10 @@
   <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- Firebase SDK 로드 전 함수 정의 -->
-  <script>
-    window.firebaseLoaded = false;
-    window.firestoreLoaded = false;
-    window.authLoaded = false;
-
-    function loadFirebaseFallback(scriptName) {
-      console.warn('CDN load failed, attempting to load from local fallback: ' + scriptName);
-      var script = document.createElement('script');
-      script.src = '/lib/' + scriptName;
-      script.onload = function() {
-        if (scriptName.includes('firebase-app')) window.firebaseLoaded = true;
-        if (scriptName.includes('firebase-firestore')) window.firestoreLoaded = true;
-        if (scriptName.includes('firebase-auth')) window.authLoaded = true;
-        checkFirebaseLoadStatus();
-      };
-      script.onerror = function() {
-        console.error('Failed to load fallback for ' + scriptName);
-        document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 로컬 폴백도 실패했습니다.</div>';
-      };
-      document.head.appendChild(script);
-    }
-
-    function checkFirebaseLoadStatus() {
-      if (window.firebaseLoaded && window.firestoreLoaded && window.authLoaded) {
-        initializeFirebase();
-      }
-    }
-
-    function initializeFirebase() {
-      if (typeof firebase === 'undefined') {
-        console.error('Firebase SDK failed to load from CDN and fallback.');
-        document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 네트워크를 확인하거나 나중에 다시 시도해주세요.</div>';
-      } else {
-        var firebaseConfig = {
-          apiKey: "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o",
-          authDomain: "j2wbibleinfinitescroll.firebaseapp.com",
-          projectId: "j2wbibleinfinitescroll",
-          storageBucket: "j2wbibleinfinitescroll.firebasestorage.app",
-          messagingSenderId: "1083438447830",
-          appId: "1:1083438447830:web:2d9b2d2fecf2e3f440dd77"
-        };
-        try {
-          firebase.initializeApp(firebaseConfig);
-          console.log('Firebase initialized successfully');
-        } catch (e) {
-          console.error('Firebase initialization failed:', e);
-          document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase 초기화에 실패했습니다: ' + e.message + '</div>';
-        }
-      }
-    }
-  </script>
   <!-- Firebase SDK 추가 (Google Firebase CDN 사용) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js" onload="window.firebaseLoaded = true" onerror="window.firebaseLoaded = false; loadFirebaseFallback('firebase-app-compat-10.12.5.min.js')"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js" onload="window.firestoreLoaded = true" onerror="window.firestoreLoaded = false; loadFirebaseFallback('firebase-firestore-compat-10.12.5.min.js')"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js" onload="window.authLoaded = true" onerror="window.authLoaded = false; loadFirebaseFallback('firebase-auth-compat-10.12.5.min.js')"></script>
-  <script>
-    window.onload = function() {
-      if (!window.firebaseLoaded || !window.firestoreLoaded || !window.authLoaded) {
-        console.error('One or more Firebase SDKs failed to load from CDN.');
-        document.body.innerHTML = '<div style="color: red; padding: 20px;">Firebase SDK 로드에 실패했습니다. 네트워크를 확인하거나 나중에 다시 시도해주세요.</div>';
-        return;
-      }
-      initializeFirebase();
-    };
-  </script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
   <style>
     body {
       margin: 0;
@@ -330,5 +260,6 @@
   <audio id="bgm" loop></audio>
   <script src="/index.js"></script>
   <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93a009996b75453e',t:'MTc0NjI3ODIzNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93a037800f814507',t:'MTc0NjI4MDExNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
