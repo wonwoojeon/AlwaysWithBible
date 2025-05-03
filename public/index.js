@@ -2,6 +2,15 @@ var useState = React.useState;
 var useEffect = React.useEffect;
 var useRef = React.useRef;
 
+// 디바운싱 함수
+function debounce(func, wait) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
 // Firebase 초기화 변수
 let db, auth;
 
@@ -75,7 +84,7 @@ var App = function () {
   var fontSizeState = useState(1);
   var fontSize = fontSizeState[0];
   var setFontSize = fontSizeState[1];
-  var lineHeightState = useState(fontSize * 1.2);
+  var lineHeightState = useState(1.2); // 초기값 고정
   var lineHeight = lineHeightState[0];
   var setLineHeight = lineHeightState[1];
   var containerWidthState = useState(672);
@@ -143,10 +152,19 @@ var App = function () {
   var authTab = authTabState[0];
   var setAuthTab = authTabState[1];
 
+  // 디바운싱된 상태 업데이트 함수
+  var debouncedSetFontSize = debounce(setFontSize, 300);
+  var debouncedSetLineHeight = debounce(setLineHeight, 300);
+  var debouncedSetScrollSpeed = debounce(setScrollSpeed, 300);
+  var debouncedSetContainerWidth = debounce(setContainerWidth, 300);
+  var debouncedSetSpeechVolume = debounce(setSpeechVolume, 300);
+  var debouncedSetBgmVolume = debounce(setBgmVolume, 300);
+
   // Firebase 초기화 확인
   useEffect(function () {
     if (!db || !auth) {
       setError('Firebase 초기화에 실패했습니다. 새로고침 후 다시 시도해주세요.');
+      setDataLoading(false);
       return;
     }
   }, []);
@@ -154,19 +172,17 @@ var App = function () {
   // 사용자 인증 상태 감지
   useEffect(function () {
     if (!auth) return;
+    setDataLoading(true); // 인증 상태 확인 시작 시 로딩
     var unsubscribe = auth.onAuthStateChanged(function (firebaseUser) {
       setUser(firebaseUser);
-      setDataLoading(false); // 인증 상태 확인 후 로딩 해제
+      if (!firebaseUser) {
+        setDataLoading(false); // 사용자가 없으면 로딩 종료
+      }
     });
     return function () {
       unsubscribe();
     };
   }, []);
-
-  // 글자 크기 변경 시 줄간격 초기값 동기화
-  useEffect(function () {
-    setLineHeight(fontSize * 1.2);
-  }, [fontSize]);
 
   // BGM 파일 목록 로드
   useEffect(function () {
@@ -241,11 +257,11 @@ var App = function () {
         setVerses(savedVerses);
         console.log('Verses loaded from Firestore:', savedVerses);
       } else {
-        console.log('No verses found for user, initializing empty array');
-        setVerses([]);
+        console.log('No verses found for user, initializing empty array in Firestore');
         versesRef.set({
           verses: []
         });
+        setVerses([]);
       }
       setDataLoading(false); // 데이터 로드 완료
     }, function (e) {
@@ -913,7 +929,7 @@ var App = function () {
     step: "0.1",
     value: scrollSpeed,
     onChange: function (e) {
-      setScrollSpeed(parseFloat(e.target.value));
+      debouncedSetScrollSpeed(parseFloat(e.target.value));
     },
     className: "slider"
   }), /*#__PURE__*/React.createElement("p", null, "\uC74C\uC131 \uC7AC\uC0DD \uC18D\uB3C4: ", speechRate.toFixed(1))), /*#__PURE__*/React.createElement("div", {
@@ -930,7 +946,7 @@ var App = function () {
     step: "0.1",
     value: fontSize,
     onChange: function (e) {
-      setFontSize(parseFloat(e.target.value));
+      debouncedSetFontSize(parseFloat(e.target.value));
     },
     className: "slider"
   })), /*#__PURE__*/React.createElement("div", {
@@ -947,7 +963,7 @@ var App = function () {
     step: "0.1",
     value: lineHeight,
     onChange: function (e) {
-      setLineHeight(parseFloat(e.target.value));
+      debouncedSetLineHeight(parseFloat(e.target.value));
     },
     className: "slider"
   })), /*#__PURE__*/React.createElement("div", {
@@ -964,7 +980,7 @@ var App = function () {
     step: "10",
     value: containerWidth,
     onChange: function (e) {
-      setContainerWidth(parseInt(e.target.value));
+      debouncedSetContainerWidth(parseInt(e.target.value));
     },
     className: "slider"
   })), /*#__PURE__*/React.createElement("div", {
@@ -981,7 +997,7 @@ var App = function () {
     step: "0.1",
     value: speechVolume,
     onChange: function (e) {
-      setSpeechVolume(parseFloat(e.target.value));
+      debouncedSetSpeechVolume(parseFloat(e.target.value));
     },
     className: "slider"
   })), /*#__PURE__*/React.createElement("div", {
@@ -998,7 +1014,7 @@ var App = function () {
     step: "0.1",
     value: bgmVolume,
     onChange: function (e) {
-      setBgmVolume(parseFloat(e.target.value));
+      debouncedSetBgmVolume(parseFloat(e.target.value));
     },
     className: "slider"
   })), /*#__PURE__*/React.createElement("button", {
