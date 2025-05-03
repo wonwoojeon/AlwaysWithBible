@@ -1,7 +1,12 @@
 var useState = React.useState;
 var useEffect = React.useEffect;
 var useRef = React.useRef;
+
+// Firebase Firestore 및 Auth 초기화
+var db = firebase.firestore();
+var auth = firebase.auth();
 var App = function () {
+  // 기존 상태
   var versesState = useState([]);
   var verses = versesState[0];
   var setVerses = versesState[1];
@@ -35,9 +40,6 @@ var App = function () {
   var isCollapsedState = useState(false);
   var isCollapsed = isCollapsedState[0];
   var setIsCollapsed = isCollapsedState[1];
-  var isSoundOnState = useState(false);
-  var isSoundOn = isSoundOnState[0];
-  var setIsSoundOn = isSoundOnState[1];
   var scrollRef = useRef(null);
   var scrollPosState = useState(0);
   var scrollPos = scrollPosState[0];
@@ -45,6 +47,7 @@ var App = function () {
   var koreanDataState = useState(null);
   var koreanData = koreanDataState[0];
   var setKoreanData = koreanDataState[1];
+
   // BGM 관련 상태
   var bgmListState = useState([]);
   var bgmList = bgmListState[0];
@@ -52,6 +55,54 @@ var App = function () {
   var currentBgmState = useState(null);
   var currentBgm = currentBgmState[0];
   var setCurrentBgm = currentBgmState[1];
+
+  // BGM과 음성 소리 분리
+  var isBgmOnState = useState(false);
+  var isBgmOn = isBgmOnState[0];
+  var setIsBgmOn = isBgmOnState[1];
+  var isVoiceOnState = useState(true);
+  var isVoiceOn = isVoiceOnState[0];
+  var setIsVoiceOn = isVoiceOnState[1];
+
+  // 음성 소리 볼륨 상태
+  var speechVolumeState = useState(1.0);
+  var speechVolume = speechVolumeState[0];
+  var setSpeechVolume = speechVolumeState[1];
+
+  // 로그인 및 회원가입 상태
+  var userState = useState(null);
+  var user = userState[0];
+  var setUser = userState[1];
+  var usernameState = useState('');
+  var username = usernameState[0];
+  var setUsername = usernameState[1];
+  var passwordState = useState('');
+  var password = passwordState[0];
+  var setPassword = passwordState[1];
+  var signupUsernameState = useState('');
+  var signupUsername = signupUsernameState[0];
+  var setSignupUsername = signupUsernameState[1];
+  var signupPasswordState = useState('');
+  var signupPassword = signupPasswordState[0];
+  var setSignupPassword = signupPasswordState[1];
+
+  // 공유된 구절 상태
+  var sharedVersesState = useState([]);
+  var sharedVerses = sharedVersesState[0];
+  var setSharedVerses = sharedVersesState[1];
+
+  // 사용자 인증 상태 감지
+  useEffect(function () {
+    var unsubscribe = auth.onAuthStateChanged(function (firebaseUser) {
+      setUser(firebaseUser);
+      if (!firebaseUser) {
+        setVerses([]);
+      }
+    });
+    return function () {
+      unsubscribe();
+    };
+  }, []);
 
   // 글자 크기 변경 시 줄간격 초기값 동기화
   useEffect(function () {
@@ -83,11 +134,8 @@ var App = function () {
     var bgmElement = document.getElementById('bgm');
     if (!bgmElement || !currentBgm) return;
     bgmElement.src = currentBgm;
-    bgmElement.onended = function () {
-      var randomIndex = Math.floor(Math.random() * bgmList.length);
-      setCurrentBgm(bgmList[randomIndex]);
-    };
-    if (isSoundOn) {
+    // loop 속성이 추가되었으므로 onended 이벤트 제거
+    if (isBgmOn) {
       bgmElement.play().catch(function (e) {
         console.error('BGM 재생 실패:', e);
         setError('BGM 재생에 실패했습니다: 브라우저 정책에 의해 차단되었거나 파일을 로드할 수 없습니다. (' + e.message + ')');
@@ -95,7 +143,7 @@ var App = function () {
     } else {
       bgmElement.pause();
     }
-  }, [isSoundOn, currentBgm, bgmList]);
+  }, [isBgmOn, currentBgm, bgmList]);
   useEffect(function () {
     console.log('Fetching ko_rev.json...');
     fetch('/assets/ko_rev.json').then(function (response) {
@@ -109,28 +157,57 @@ var App = function () {
       setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message + '. 서버에 /assets/ko_rev.json 파일이 있는지 확인해주세요.');
     });
   }, []);
+
+  // 로그인 상태에 따라 구절 로드
   useEffect(function () {
-    console.log('Loading verses from localStorage...');
-    var saved = localStorage.getItem('verses');
-    if (saved) {
-      try {
-        setVerses(JSON.parse(saved));
-        console.log('Verses loaded from localStorage:', saved);
-      } catch (e) {
-        console.error('Failed to parse verses from localStorage:', e);
-        setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
+    if (!user) return;
+    var userId = user.uid;
+    console.log('Loading verses for user:', userId);
+    var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
+    versesRef.get().then(function (doc) {
+      if (doc.exists) {
+        var savedVerses = doc.data().verses || [];
+        setVerses(savedVerses);
+        console.log('Verses loaded from Firestore:', savedVerses);
       }
-    }
-  }, []);
+    }).catch(function (e) {
+      console.error('Failed to load verses from Firestore:', e);
+      setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
+    });
+  }, [user]);
+
+  // 구절 저장 (로그인 상태일 때만)
   useEffect(function () {
-    console.log('Saving verses to localStorage:', verses);
-    try {
-      localStorage.setItem('verses', JSON.stringify(verses));
-    } catch (e) {
-      console.error('Failed to save verses to localStorage:', e);
+    if (!user) return;
+    var userId = user.uid;
+    console.log('Saving verses for user:', userId, verses);
+    var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
+    versesRef.set({
+      verses: verses
+    }).catch(function (e) {
+      console.error('Failed to save verses to Firestore:', e);
       setError('구절을 저장하지 못했습니다: ' + e.message);
-    }
-  }, [verses]);
+    });
+  }, [verses, user]);
+
+  // 공유된 구절 로드
+  useEffect(function () {
+    var sharedRef = db.collection('shared_verses');
+    sharedRef.get().then(function (querySnapshot) {
+      var shared = [];
+      querySnapshot.forEach(function (doc) {
+        shared.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      setSharedVerses(shared);
+      console.log('Shared verses loaded:', shared);
+    }).catch(function (e) {
+      console.error('Failed to load shared verses:', e);
+      setError('공유된 구절을 불러오지 못했습니다: ' + e.message);
+    });
+  }, []);
   useEffect(function () {
     console.log('Starting auto-scroll with speed:', scrollSpeed);
     var scroll = function () {
@@ -162,14 +239,14 @@ var App = function () {
     console.log('Speech rate updated:', newSpeechRate);
   }, [scrollSpeed]);
   var animationDuration = verses.length > 0 ? 10 + verses.length * 2 : 10;
-  var toggleSound = function () {
-    if (isSoundOn) {
+  var toggleBgm = function () {
+    setIsBgmOn(!isBgmOn);
+  };
+  var toggleVoice = function () {
+    if (isVoiceOn) {
       window.speechSynthesis.cancel();
-      // BGM 일시정지는 useEffect에서 처리
-    } else {
-      // BGM 재생은 useEffect에서 처리
     }
-    setIsSoundOn(!isSoundOn);
+    setIsVoiceOn(!isVoiceOn);
   };
   var deleteVerse = function (index) {
     console.log('Deleting verse at index:', index);
@@ -177,6 +254,75 @@ var App = function () {
       return i !== index;
     });
     setVerses(updatedVerses);
+  };
+  var signup = function () {
+    if (!signupUsername || !signupPassword) {
+      setError('이메일과 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+    auth.createUserWithEmailAndPassword(signupUsername, signupPassword).then(function (userCredential) {
+      setError('회원가입이 완료되었습니다. 로그인해주세요.');
+      setSignupUsername('');
+      setSignupPassword('');
+    }).catch(function (error) {
+      console.error('Signup error:', error);
+      setError('회원가입 실패: ' + error.message);
+    });
+  };
+  var login = function () {
+    if (!username || !password) {
+      setError('이메일과 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+    auth.signInWithEmailAndPassword(username, password).then(function (userCredential) {
+      setError('');
+      setUsername('');
+      setPassword('');
+    }).catch(function (error) {
+      console.error('Login error:', error);
+      setError('로그인 실패: ' + error.message);
+    });
+  };
+  var logout = function () {
+    auth.signOut().then(function () {
+      setUser(null);
+      setVerses([]);
+      setError('');
+    }).catch(function (error) {
+      console.error('Logout error:', error);
+      setError('로그아웃 실패: ' + error.message);
+    });
+  };
+  var shareVerse = function (verse) {
+    if (!user) {
+      setError('로그인 후 구절을 공유할 수 있습니다.');
+      return;
+    }
+    var sharedRef = db.collection('shared_verses').doc();
+    sharedRef.set({
+      verse: verse,
+      sharedBy: user.email,
+      sharedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function () {
+      setError('구절이 공유되었습니다.');
+      // 공유된 구절 목록 갱신
+      db.collection('shared_verses').get().then(function (querySnapshot) {
+        var shared = [];
+        querySnapshot.forEach(function (doc) {
+          shared.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+        setSharedVerses(shared);
+      });
+    }).catch(function (e) {
+      console.error('Failed to share verse:', e);
+      setError('구절 공유 실패: ' + e.message);
+    });
+  };
+  var addSharedVerse = function (sharedVerse) {
+    setVerses(verses.concat([sharedVerse.verse]));
   };
   var searchVerses = async function () {
     setLoading(true);
@@ -368,14 +514,16 @@ var App = function () {
       return i !== index;
     });
     setSearchResults(updatedResults);
-    if (isSoundOn) {
+    if (isVoiceOn) {
       var utterance = new SpeechSynthesisUtterance(verse.kjvText);
       utterance.lang = 'en-US';
       utterance.rate = speechRate;
+      utterance.volume = speechVolume;
       window.speechSynthesis.speak(utterance);
       var krUtterance = new SpeechSynthesisUtterance(verse.krvText);
       krUtterance.lang = 'ko-KR';
       krUtterance.rate = speechRate;
+      krUtterance.volume = speechVolume;
       window.speechSynthesis.speak(krUtterance);
     }
   };
@@ -485,12 +633,61 @@ var App = function () {
     className: "title-bar"
   }, /*#__PURE__*/React.createElement("h1", {
     className: "title"
-  }, "J2W 2027 Bible Infinite Scroll"), /*#__PURE__*/React.createElement("button", {
+  }, "j2w_2027 Bible Infinite Scroll"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setIsCollapsed(!isCollapsed);
     },
     className: "toggle-button"
-  }, isCollapsed ? '▼' : '▲')), !isCollapsed && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, isCollapsed ? '▼' : '▲')), !user && /*#__PURE__*/React.createElement("div", {
+    className: "mb-4"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "subtitle"
+  }, "\uB85C\uADF8\uC778"), /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: username,
+    onChange: function (e) {
+      setUsername(e.target.value);
+    },
+    placeholder: "\uC774\uBA54\uC77C (\uC608: user@example.com)",
+    className: "input"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    value: password,
+    onChange: function (e) {
+      setPassword(e.target.value);
+    },
+    placeholder: "\uBE44\uBC00\uBC88\uD638",
+    className: "input"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: login,
+    className: "button"
+  }, "\uB85C\uADF8\uC778"), /*#__PURE__*/React.createElement("h2", {
+    className: "subtitle"
+  }, "\uD68C\uC6D0\uAC00\uC785"), /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: signupUsername,
+    onChange: function (e) {
+      setSignupUsername(e.target.value);
+    },
+    placeholder: "\uC774\uBA54\uC77C (\uC608: user@example.com)",
+    className: "input"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    value: signupPassword,
+    onChange: function (e) {
+      setSignupPassword(e.target.value);
+    },
+    placeholder: "\uBE44\uBC00\uBC88\uD638",
+    className: "input"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: signup,
+    className: "button"
+  }, "\uD68C\uC6D0\uAC00\uC785")), user && /*#__PURE__*/React.createElement("div", {
+    className: "mb-4"
+  }, /*#__PURE__*/React.createElement("p", null, "\uD658\uC601\uD569\uB2C8\uB2E4, ", user.email, "\uB2D8!"), /*#__PURE__*/React.createElement("button", {
+    onClick: logout,
+    className: "button"
+  }, "\uB85C\uADF8\uC544\uC6C3")), !isCollapsed && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "mb-4"
   }, /*#__PURE__*/React.createElement("input", {
     type: "text",
@@ -520,7 +717,13 @@ var App = function () {
         deleteVerse(idx % verses.length);
       },
       className: "delete-button"
-    }, "X"));
+    }, "X"), user && /*#__PURE__*/React.createElement("button", {
+      onClick: function (e) {
+        e.stopPropagation();
+        shareVerse(verse);
+      },
+      className: "share-button"
+    }, "\uACF5\uC720"));
   })))), /*#__PURE__*/React.createElement("div", {
     className: "slider-container"
   }, /*#__PURE__*/React.createElement("label", {
@@ -577,10 +780,27 @@ var App = function () {
       setContainerWidth(parseInt(e.target.value));
     },
     className: "slider"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "slider-container"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "slider-label"
+  }, "\uC74C\uC131 \uBCFC\uB968: ", speechVolume.toFixed(1)), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: "0",
+    max: "1",
+    step: "0.1",
+    value: speechVolume,
+    onChange: function (e) {
+      setSpeechVolume(parseFloat(e.target.value));
+    },
+    className: "slider"
   })), /*#__PURE__*/React.createElement("button", {
-    onClick: toggleSound,
+    onClick: toggleBgm,
     className: "sound-button"
-  }, isSoundOn ? '🔊 소리 끄기' : '🔇 소리 켜기')), loading && /*#__PURE__*/React.createElement("p", {
+  }, isBgmOn ? '🎵 BGM 끄기' : '🎶 BGM 켜기'), /*#__PURE__*/React.createElement("button", {
+    onClick: toggleVoice,
+    className: "sound-button"
+  }, isVoiceOn ? '🗣️ 음성 끄기' : '🔈 음성 켜기')), loading && /*#__PURE__*/React.createElement("p", {
     className: "loading"
   }, "\uAC80\uC0C9 \uC911..."), error && /*#__PURE__*/React.createElement("div", {
     className: "error"
@@ -602,6 +822,26 @@ var App = function () {
     }, result.query, ": ", result.kjvText, " (KJV)"), /*#__PURE__*/React.createElement("p", {
       className: "ml-6"
     }, result.krvText, " (\uAC1C\uC5ED\uAC1C\uC815)"));
+  })), sharedVerses.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "mb-4"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "subtitle"
+  }, "\uACF5\uC720\uB41C \uAD6C\uC808"), sharedVerses.map(function (sharedVerse) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: sharedVerse.id,
+      className: "verse"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        addSharedVerse(sharedVerse);
+      },
+      className: "button"
+    }, "\uCD94\uAC00"), /*#__PURE__*/React.createElement("span", {
+      className: "ml-2"
+    }, sharedVerse.verse.query, ": ", sharedVerse.verse.kjvText, " (KJV)"), /*#__PURE__*/React.createElement("p", {
+      className: "ml-6"
+    }, sharedVerse.verse.krvText, " (\uAC1C\uC5ED\uAC1C\uC815)"), /*#__PURE__*/React.createElement("p", {
+      className: "ml-6"
+    }, "\uACF5\uC720\uC790: ", sharedVerse.sharedBy));
   })), /*#__PURE__*/React.createElement("div", {
     ref: scrollRef,
     className: "scroll-area",
@@ -631,9 +871,7 @@ var App = function () {
         lineHeight: lineHeight + 'rem'
       }
     }, verse.krvText, " (\uAC1C\uC5ED\uAC1C\uC815)"));
-  })) : /*#__PURE__*/React.createElement("p", null, "\uAD6C\uC808\uC744 \uCD94\uAC00\uD558\uC138\uC694.")), /*#__PURE__*/React.createElement("audio", {
-    id: "bgm"
-  }));
+  })) : /*#__PURE__*/React.createElement("p", null, "\uAD6C\uC808\uC744 \uCD94\uAC00\uD558\uC138\uC694.")));
 };
 ReactDOM.render(/*#__PURE__*/React.createElement(App, null), document.getElementById('root'));
 console.log('App rendered successfully.');
