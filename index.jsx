@@ -21,7 +21,7 @@ function initializeFirebase() {
     return false;
   }
   const firebaseConfig = {
-    apiKey: process.env.FIREBASE_API_KEY || "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o", // 환경 변수로 대체
+    apiKey: process.env.FIREBASE_API_KEY || "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o",
     authDomain: "j2wbibleinfinitescroll.firebaseapp.com",
     projectId: "j2wbibleinfinitescroll",
     storageBucket: "j2wbibleinfinitescroll.firebasestorage.app",
@@ -51,7 +51,7 @@ function tryInitializeFirebase() {
   if (initializeFirebase()) {
     return;
   }
-  setTimeout(tryInitializeFirebase, 1000); // 1초 후 재시도
+  setTimeout(tryInitializeFirebase, 1000);
 }
 tryInitializeFirebase();
 
@@ -76,7 +76,6 @@ function saveVersesToLocalStorage(verses) {
 }
 
 var App = function () {
-  // 상태 정의 (초기값 중첩 제거)
   var [verses, setVerses] = useState(loadVersesFromLocalStorage());
   var [input, setInput] = useState('');
   var [searchResults, setSearchResults] = useState([]);
@@ -107,7 +106,6 @@ var App = function () {
   var [showAuthPopup, setShowAuthPopup] = useState(false);
   var [authTab, setAuthTab] = useState('login');
 
-  // 디바운싱된 상태 업데이트 함수
   var debouncedSetFontSize = debounce(setFontSize, 300);
   var debouncedSetLineHeight = debounce(setLineHeight, 300);
   var debouncedSetScrollSpeed = debounce(setScrollSpeed, 300);
@@ -115,9 +113,8 @@ var App = function () {
   var debouncedSetSpeechVolume = debounce(setSpeechVolume, 300);
   var debouncedSetBgmVolume = debounce(setBgmVolume, 300);
 
-  // Firestore 동기화를 위한 디바운싱 (1분 간격)
   var debouncedSyncVersesToFirestore = debounce(function () {
-    if (!db || !user) return;
+    if (!db || !user) return; // 로그인하지 않은 경우 Firestore 쓰기 시도 안 함
     var versesRef = db.collection('shared_verses').doc('data');
     versesRef.set({
       verses: verses,
@@ -134,7 +131,6 @@ var App = function () {
     });
   }, 60000);
 
-  // 설정 저장을 위한 디바운싱 (5분 간격)
   var debouncedSaveSettings = debounce(function () {
     if (!db || !user) return;
     var userId = user.uid;
@@ -155,14 +151,12 @@ var App = function () {
     });
   }, 300000);
 
-  // Firebase 초기화 확인
   useEffect(function () {
     if (!db || !auth) {
       console.log('Firebase 초기화 실패, 로컬 캐시만 사용합니다.');
     }
   }, [db, auth]);
 
-  // 사용자 인증 상태 감지
   useEffect(function () {
     if (!auth) return;
     var unsubscribe = auth.onAuthStateChanged(function (firebaseUser) {
@@ -176,7 +170,6 @@ var App = function () {
     };
   }, [auth]);
 
-  // BGM 파일 목록 로드
   useEffect(function () {
     fetch('/assets/index.json')
       .then(function (response) {
@@ -204,7 +197,6 @@ var App = function () {
       });
   }, []);
 
-  // BGM 소스 설정 및 재생 로직
   useEffect(function () {
     var bgmElement = document.getElementById('bgm');
     if (!bgmElement || !currentBgm) return;
@@ -245,14 +237,12 @@ var App = function () {
     };
   }, [isBgmOn, currentBgm, bgmList]);
 
-  // BGM 볼륨 업데이트 로직
   useEffect(function () {
     var bgmElement = document.getElementById('bgm');
     if (!bgmElement) return;
     bgmElement.volume = bgmVolume;
   }, [bgmVolume]);
 
-  // 한글 성경 데이터 로드
   useEffect(function () {
     fetch('/assets/ko_rev.json')
       .then(function (response) {
@@ -273,7 +263,6 @@ var App = function () {
       });
   }, []);
 
-  // 로그인 시 Firestore에서 구절 동기화
   useEffect(function () {
     if (!db || !user) return;
     setDataLoading(true);
@@ -325,7 +314,6 @@ var App = function () {
     });
   }, [user, db]);
 
-  // 사용자 설정 로드
   useEffect(function () {
     if (!db || !user) return;
     var userId = user.uid;
@@ -366,7 +354,6 @@ var App = function () {
     });
   }, [user, db]);
 
-  // 구절 변경 시 로컬 캐시에 저장하고, 로그인 상태라면 Firestore와 동기화
   useEffect(function () {
     saveVersesToLocalStorage(verses);
     if (user) {
@@ -374,13 +361,11 @@ var App = function () {
     }
   }, [verses, user, debouncedSyncVersesToFirestore]);
 
-  // 사용자 설정 저장
   useEffect(function () {
     if (!db || !user) return;
     debouncedSaveSettings();
   }, [scrollSpeed, fontSize, lineHeight, containerWidth, speechVolume, bgmVolume, user, db, debouncedSaveSettings]);
 
-  // 음성 볼륨 변경 시 재생 중인 음성 업데이트
   useEffect(function () {
     if (!isVoiceOn || currentUtterancesRef.current.length === 0) return;
     window.speechSynthesis.cancel();
@@ -390,7 +375,6 @@ var App = function () {
     });
   }, [speechVolume, isVoiceOn]);
 
-  // 자동 스크롤 로직
   useEffect(function () {
     var scroll = function () {
       setScrollPos(function (prev) {
