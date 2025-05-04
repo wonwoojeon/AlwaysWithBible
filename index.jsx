@@ -177,6 +177,9 @@ var App = function () {
     }, { merge: true }).catch(function (e) {
       console.error('Failed to save settings to Firestore:', e);
       setError('설정을 저장하지 못했습니다: ' + e.message);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
     });
   }, 300000); // 5분 = 300,000ms
 
@@ -185,6 +188,9 @@ var App = function () {
     if (!db || !auth) {
       setError('Firebase 초기화에 실패했습니다. 새로고침 후 다시 시도해주세요.');
       setDataLoading(false);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
       return;
     }
   }, []);
@@ -227,6 +233,9 @@ var App = function () {
       .catch(function (err) {
         console.error('Error loading BGM list:', err.message);
         setError('BGM 목록을 불러오지 못했습니다: ' + err.message);
+        setTimeout(function () {
+          setError('');
+        }, 3000);
       });
   }, []);
 
@@ -234,15 +243,43 @@ var App = function () {
   useEffect(function () {
     var bgmElement = document.getElementById('bgm');
     if (!bgmElement || !currentBgm) return;
+
+    // BGM 재생 가능 여부 확인
     bgmElement.src = currentBgm;
-    if (isBgmOn) {
-      bgmElement.play().catch(function (e) {
-        console.error('BGM 재생 실패:', e);
-        setError('BGM 재생에 실패했습니다: 브라우저 정책에 의해 차단되었거나 파일을 로드할 수 없습니다. (' + e.message + ')');
-      });
-    } else {
-      bgmElement.pause();
-    }
+    bgmElement.load(); // 리소스 로드
+
+    var playBgm = function () {
+      if (isBgmOn) {
+        var playPromise = bgmElement.play();
+        if (playPromise !== undefined) {
+          playPromise.then(function () {
+            console.log('BGM 재생 성공:', currentBgm);
+          }).catch(function (e) {
+            console.error('BGM 재생 실패:', e);
+            setError('BGM 재생에 실패했습니다: 브라우저 정책에 의해 차단되었거나 파일을 로드할 수 없습니다. (' + e.message + ')');
+            setTimeout(function () {
+              setError('');
+            }, 3000);
+          });
+        }
+      } else {
+        bgmElement.pause();
+      }
+    };
+
+    // BGM이 재생 가능한 상태인지 확인
+    bgmElement.addEventListener('canplaythrough', playBgm, { once: true });
+    bgmElement.addEventListener('error', function (e) {
+      console.error('BGM 로드 실패:', e);
+      setError('BGM 파일을 로드할 수 없습니다. (' + e.message + ')');
+      setTimeout(function () {
+        setError('');
+      }, 3000);
+    }, { once: true });
+
+    return function () {
+      bgmElement.removeEventListener('canplaythrough', playBgm);
+    };
   }, [isBgmOn, currentBgm, bgmList]);
 
   // BGM 볼륨 업데이트 로직 분리
@@ -269,6 +306,9 @@ var App = function () {
       .catch(function (err) {
         console.error('Error loading ko_rev.json:', err.message);
         setError('한글 성경 데이터를 불러오지 못했습니다: ' + err.message + '. 서버에 /assets/ko_rev.json 파일이 있는지 확인해주세요.');
+        setTimeout(function () {
+          setError('');
+        }, 3000);
       });
   }, []);
 
@@ -286,14 +326,25 @@ var App = function () {
         console.log('Verses loaded from Firestore:', savedVerses);
       } else {
         console.log('No verses found for user, initializing empty array in Firestore');
-        versesRef.set({ verses: [] });
-        setVerses([]);
+        versesRef.set({ verses: [] }).then(function () {
+          setVerses([]);
+          console.log('Initialized empty verses array in Firestore');
+        }).catch(function (e) {
+          console.error('Failed to initialize verses in Firestore:', e);
+          setError('구절 데이터 초기화 실패: ' + e.message);
+          setTimeout(function () {
+            setError('');
+          }, 3000);
+        });
       }
       setDataLoading(false); // 데이터 로드 완료
     }, function (e) {
       console.error('Failed to load verses from Firestore:', e);
       setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
       setDataLoading(false);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
     });
     return function () {
       unsubscribe();
@@ -325,11 +376,22 @@ var App = function () {
           containerWidth: 672,
           speechVolume: 1.0,
           bgmVolume: 1.0
+        }).then(function () {
+          console.log('Initialized default settings in Firestore');
+        }).catch(function (e) {
+          console.error('Failed to initialize settings in Firestore:', e);
+          setError('설정 초기화 실패: ' + e.message);
+          setTimeout(function () {
+            setError('');
+          }, 3000);
         });
       }
     }, function (e) {
       console.error('Failed to load settings from Firestore:', e);
       setError('설정을 불러오지 못했습니다: ' + e.message);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
     });
     return function () {
       unsubscribe();
@@ -344,9 +406,14 @@ var App = function () {
     var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
     versesRef.set({
       verses: verses
-    }, { merge: true }).catch(function (e) {
+    }, { merge: true }).then(function () {
+      console.log('Verses successfully saved to Firestore:', verses);
+    }).catch(function (e) {
       console.error('Failed to save verses to Firestore:', e);
       setError('구절을 저장하지 못했습니다: ' + e.message);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
     });
   }, [verses, user]);
 
@@ -432,14 +499,23 @@ var App = function () {
   var signup = function () {
     if (!auth) {
       setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
+      setTimeout(function () {
+        setError('');
+      }, 3000);
       return;
     }
     if (!signupUsername || !signupPassword) {
       setError('이메일과 비밀번호를 모두 입력해주세요.');
+      setTimeout(function () {
+        setError('');
+      }, 3000);
       return;
     }
     if (signupPassword.length < 8) {
       setError('비밀번호는 최소 8자 이상이어야 합니다.');
+      setTimeout(function () {
+        setError('');
+      }, 3000);
       return;
     }
     auth.createUserWithEmailAndPassword(signupUsername, signupPassword).then(function (userCredential) {
@@ -447,19 +523,31 @@ var App = function () {
       setSignupUsername('');
       setSignupPassword('');
       setShowAuthPopup(false);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
     }).catch(function (error) {
       console.error('Signup error:', error);
       setError('회원가입 실패: ' + error.message);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
     });
   };
 
   var login = function () {
     if (!auth) {
       setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
+      setTimeout(function () {
+        setError('');
+      }, 3000);
       return;
     }
     if (!username || !password) {
       setError('이메일과 비밀번호를 모두 입력해주세요.');
+      setTimeout(function () {
+        setError('');
+      }, 3000);
       return;
     }
     auth.signInWithEmailAndPassword(username, password).then(function (userCredential) {
@@ -470,12 +558,18 @@ var App = function () {
     }).catch(function (error) {
       console.error('Login error:', error);
       setError('로그인 실패: ' + error.message);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
     });
   };
 
   var logout = function () {
     if (!auth) {
       setError('Firebase 인증 서비스가 초기화되지 않았습니다.');
+      setTimeout(function () {
+        setError('');
+      }, 3000);
       return;
     }
     auth.signOut().then(function () {
@@ -484,6 +578,9 @@ var App = function () {
     }).catch(function (error) {
       console.error('Logout error:', error);
       setError('로그아웃 실패: ' + error.message);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
     });
   };
 
@@ -668,6 +765,9 @@ var App = function () {
     } catch (error) {
       console.error('Error fetching verses:', error.message);
       setError('구절을 불러오지 못했습니다: ' + error.message);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
     } finally {
       setLoading(false);
     }

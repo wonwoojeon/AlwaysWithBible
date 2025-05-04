@@ -1,13 +1,19 @@
+# 빌드 설정
 [build]
-  base = "."
-  publish = "public"
-  command = "npm run build"
+  command = "npm run build"  # 빌드 명령어
+  publish = "public"         # 배포 디렉토리 (React 빌드 결과물 디렉토리)
+  environment = { NODE_VERSION = "16" }  # Node.js 버전 지정 (필요 시 수정)
 
-[[redirects]]
-  from = "/index.js"
-  to = "/index.js"
-  status = 200
+# 헤더 설정 (현재 CSP 설정 유지)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval' https://*.firebase.com https://*.googleapis.com https://*.gstatic.com https://*.cloudflare.com https://*.netlify.app; object-src 'none'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    X-Frame-Options = "DENY"  # 클릭재킹 방지
+    X-Content-Type-Options = "nosniff"  # MIME 타입 스니핑 방지
+    Referrer-Policy = "strict-origin-when-cross-origin"  # 리퍼러 정책 강화
 
+# SPA 지원을 위한 리다이렉트 규칙
 [[redirects]]
   from = "/*"
   to = "/index.html"
