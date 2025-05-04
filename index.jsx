@@ -2,12 +2,12 @@ var useState = React.useState;
 var useEffect = React.useEffect;
 var useRef = React.useRef;
 
-// 디바운싱 함수
+// 디바운싱 함수 (this 컨텍스트 유지)
 function debounce(func, wait) {
   let timeout;
   return function (...args) {
     clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
+    timeout = setTimeout(() => func.apply(this, args), wait);
   };
 }
 
@@ -16,12 +16,12 @@ let db, auth;
 
 // Firebase 초기화 함수
 function initializeFirebase() {
-  if (typeof firebase === 'undefined') {
+  if (!window.firebase) {
     console.error('Firebase SDK가 로드되지 않았습니다. 재시도 중...');
     return false;
   }
   const firebaseConfig = {
-    apiKey: "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o",
+    apiKey: process.env.FIREBASE_API_KEY || "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o", // 환경 변수로 대체
     authDomain: "j2wbibleinfinitescroll.firebaseapp.com",
     projectId: "j2wbibleinfinitescroll",
     storageBucket: "j2wbibleinfinitescroll.firebasestorage.app",
@@ -29,10 +29,9 @@ function initializeFirebase() {
     appId: "1:1083438447830:web:2d9b2d2fecf2e3f440dd77"
   };
   try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    auth = firebase.auth();
-    console.log('Firebase initialized successfully in index.js');
+    window.firebase.initializeApp(firebaseConfig);
+    db = window.firebase.firestore();
+    auth = window.firebase.auth();
     return true;
   } catch (e) {
     console.error('Firebase initialization failed:', e.message);
@@ -48,110 +47,65 @@ function tryInitializeFirebase() {
     console.error('Firebase 초기화 최대 시도 횟수를 초과했습니다. 네트워크를 확인하거나 새로고침을 시도해주세요.');
     return;
   }
+  firebaseInitAttempts++;
   if (initializeFirebase()) {
     return;
   }
-  firebaseInitAttempts++;
   setTimeout(tryInitializeFirebase, 1000); // 1초 후 재시도
 }
 tryInitializeFirebase();
 
+// 로컬 캐시에서 구절 로드
+function loadVersesFromLocalStorage() {
+  try {
+    const cachedVerses = localStorage.getItem('verses');
+    return cachedVerses ? JSON.parse(cachedVerses) : [];
+  } catch (e) {
+    console.error('Failed to load verses from localStorage:', e);
+    return [];
+  }
+}
+
+// 로컬 캐시에 구절 저장
+function saveVersesToLocalStorage(verses) {
+  try {
+    localStorage.setItem('verses', JSON.stringify(verses));
+  } catch (e) {
+    console.error('Failed to save verses to localStorage:', e);
+  }
+}
+
 var App = function () {
-  // 기존 상태
-  var versesState = useState([]);
-  var verses = versesState[0];
-  var setVerses = versesState[1];
-  var inputState = useState('');
-  var input = inputState[0];
-  var setInput = inputState[1];
-  var searchResultsState = useState([]);
-  var searchResults = searchResultsState[0];
-  var setSearchResults = searchResultsState[1];
-  var errorState = useState('');
-  var error = errorState[0];
-  var setError = errorState[1];
-  var loadingState = useState(false);
-  var loading = loadingState[0];
-  var setLoading = loadingState[1];
-  var dataLoadingState = useState(true); // 데이터 로딩 상태 추가
-  var dataLoading = dataLoadingState[0];
-  var setDataLoading = dataLoadingState[1];
-  var scrollSpeedState = useState(0.5);
-  var scrollSpeed = scrollSpeedState[0];
-  var setScrollSpeed = scrollSpeedState[1];
-  var speechRateState = useState(1);
-  var speechRate = speechRateState[0];
-  var setSpeechRate = speechRateState[1];
-  var fontSizeState = useState(1);
-  var fontSize = fontSizeState[0];
-  var setFontSize = fontSizeState[1];
-  var lineHeightState = useState(1.2); // 초기값 고정
-  var lineHeight = lineHeightState[0];
-  var setLineHeight = lineHeightState[1];
-  var containerWidthState = useState(672);
-  var containerWidth = containerWidthState[0];
-  var setContainerWidth = containerWidthState[1];
-  var isCollapsedState = useState(false);
-  var isCollapsed = isCollapsedState[0];
-  var setIsCollapsed = isCollapsedState[1];
+  // 상태 정의 (초기값 중첩 제거)
+  var [verses, setVerses] = useState(loadVersesFromLocalStorage());
+  var [input, setInput] = useState('');
+  var [searchResults, setSearchResults] = useState([]);
+  var [error, setError] = useState('');
+  var [loading, setLoading] = useState(false);
+  var [dataLoading, setDataLoading] = useState(false);
+  var [scrollSpeed, setScrollSpeed] = useState(0.5);
+  var [speechRate, setSpeechRate] = useState(1);
+  var [fontSize, setFontSize] = useState(1);
+  var [lineHeight, setLineHeight] = useState(1.2);
+  var [containerWidth, setContainerWidth] = useState(672);
+  var [isCollapsed, setIsCollapsed] = useState(false);
   var scrollRef = useRef(null);
-  var scrollPosState = useState(0);
-  var scrollPos = scrollPosState[0];
-  var setScrollPos = scrollPosState[1];
-  var koreanDataState = useState(null);
-  var koreanData = koreanDataState[0];
-  var setKoreanData = koreanDataState[1];
-
-  // BGM 관련 상태
-  var bgmListState = useState([]);
-  var bgmList = bgmListState[0];
-  var setBgmList = bgmListState[1];
-  var currentBgmState = useState(null);
-  var currentBgm = currentBgmState[0];
-  var setCurrentBgm = currentBgmState[1];
-
-  // BGM과 음성 소리 분리
-  var isBgmOnState = useState(false);
-  var isBgmOn = isBgmOnState[0];
-  var setIsBgmOn = isBgmOnState[1];
-  var isVoiceOnState = useState(true);
-  var isVoiceOn = isVoiceOnState[0];
-  var setIsVoiceOn = isVoiceOnState[1];
-
-  // 음성 및 BGM 볼륨 상태
-  var speechVolumeState = useState(1.0);
-  var speechVolume = speechVolumeState[0];
-  var setSpeechVolume = speechVolumeState[1];
-  var bgmVolumeState = useState(1.0);
-  var bgmVolume = bgmVolumeState[0];
-  var setBgmVolume = bgmVolumeState[1];
-
-  // 현재 재생 중인 음성 추적
+  var [scrollPos, setScrollPos] = useState(0);
+  var [koreanData, setKoreanData] = useState(null);
+  var [bgmList, setBgmList] = useState([]);
+  var [currentBgm, setCurrentBgm] = useState(null);
+  var [isBgmOn, setIsBgmOn] = useState(false);
+  var [isVoiceOn, setIsVoiceOn] = useState(true);
+  var [speechVolume, setSpeechVolume] = useState(1.0);
+  var [bgmVolume, setBgmVolume] = useState(1.0);
   var currentUtterancesRef = useRef([]);
-
-  // 로그인 및 회원가입 상태
-  var userState = useState(null);
-  var user = userState[0];
-  var setUser = userState[1];
-  var usernameState = useState('');
-  var username = usernameState[0];
-  var setUsername = usernameState[1];
-  var passwordState = useState('');
-  var password = passwordState[0];
-  var setPassword = passwordState[1];
-  var signupUsernameState = useState('');
-  var signupUsername = signupUsernameState[0];
-  var setSignupUsername = signupUsernameState[1];
-  var signupPasswordState = useState('');
-  var signupPassword = signupPasswordState[0];
-  var setSignupPassword = signupPasswordState[1];
-  // 팝업 상태
-  var showAuthPopupState = useState(false);
-  var showAuthPopup = showAuthPopupState[0];
-  var setShowAuthPopup = showAuthPopupState[1];
-  var authTabState = useState('login'); // 'login' 또는 'signup'
-  var authTab = authTabState[0];
-  var setAuthTab = authTabState[1];
+  var [user, setUser] = useState(null);
+  var [username, setUsername] = useState('');
+  var [password, setPassword] = useState('');
+  var [signupUsername, setSignupUsername] = useState('');
+  var [signupPassword, setSignupPassword] = useState('');
+  var [showAuthPopup, setShowAuthPopup] = useState(false);
+  var [authTab, setAuthTab] = useState('login');
 
   // 디바운싱된 상태 업데이트 함수
   var debouncedSetFontSize = debounce(setFontSize, 300);
@@ -161,11 +115,29 @@ var App = function () {
   var debouncedSetSpeechVolume = debounce(setSpeechVolume, 300);
   var debouncedSetBgmVolume = debounce(setBgmVolume, 300);
 
+  // Firestore 동기화를 위한 디바운싱 (1분 간격)
+  var debouncedSyncVersesToFirestore = debounce(function () {
+    if (!db || !user) return;
+    var versesRef = db.collection('shared_verses').doc('data');
+    versesRef.set({
+      verses: verses,
+      sharedAt: new Date().toISOString(),
+      sharedBy: user.email
+    }, { merge: true }).then(function () {
+      console.log('Verses successfully synced to shared_verses');
+    }).catch(function (e) {
+      console.error('Failed to sync verses to shared_verses:', e);
+      setError('구절 동기화 실패: ' + e.message);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
+    });
+  }, 60000);
+
   // 설정 저장을 위한 디바운싱 (5분 간격)
   var debouncedSaveSettings = debounce(function () {
     if (!db || !user) return;
     var userId = user.uid;
-    console.log('Saving settings for user (debounced):', userId);
     var settingsRef = db.collection('users').doc(userId).collection('settings').doc('data');
     settingsRef.set({
       scrollSpeed: scrollSpeed,
@@ -181,35 +153,28 @@ var App = function () {
         setError('');
       }, 3000);
     });
-  }, 300000); // 5분 = 300,000ms
+  }, 300000);
 
   // Firebase 초기화 확인
   useEffect(function () {
     if (!db || !auth) {
-      setError('Firebase 초기화에 실패했습니다. 새로고침 후 다시 시도해주세요.');
-      setDataLoading(false);
-      setTimeout(function () {
-        setError('');
-      }, 3000);
-      return;
+      console.log('Firebase 초기화 실패, 로컬 캐시만 사용합니다.');
     }
-  }, []);
+  }, [db, auth]);
 
   // 사용자 인증 상태 감지
   useEffect(function () {
     if (!auth) return;
-    setDataLoading(true); // 인증 상태 확인 시작 시 로딩
     var unsubscribe = auth.onAuthStateChanged(function (firebaseUser) {
       setUser(firebaseUser);
       if (!firebaseUser) {
-        setDataLoading(false); // 사용자가 없으면 로딩 종료
-        setVerses([]); // 로그아웃 시 구절 초기화
+        console.log('User logged out, using local cache only.');
       }
     });
     return function () {
       unsubscribe();
     };
-  }, []);
+  }, [auth]);
 
   // BGM 파일 목록 로드
   useEffect(function () {
@@ -244,16 +209,15 @@ var App = function () {
     var bgmElement = document.getElementById('bgm');
     if (!bgmElement || !currentBgm) return;
 
-    // BGM 재생 가능 여부 확인
     bgmElement.src = currentBgm;
-    bgmElement.load(); // 리소스 로드
+    bgmElement.load();
 
     var playBgm = function () {
       if (isBgmOn) {
         var playPromise = bgmElement.play();
         if (playPromise !== undefined) {
           playPromise.then(function () {
-            console.log('BGM 재생 성공:', currentBgm);
+            console.log('BGM 재생 성공');
           }).catch(function (e) {
             console.error('BGM 재생 실패:', e);
             setError('BGM 재생에 실패했습니다: 브라우저 정책에 의해 차단되었거나 파일을 로드할 수 없습니다. (' + e.message + ')');
@@ -267,7 +231,6 @@ var App = function () {
       }
     };
 
-    // BGM이 재생 가능한 상태인지 확인
     bgmElement.addEventListener('canplaythrough', playBgm, { once: true });
     bgmElement.addEventListener('error', function (e) {
       console.error('BGM 로드 실패:', e);
@@ -282,7 +245,7 @@ var App = function () {
     };
   }, [isBgmOn, currentBgm, bgmList]);
 
-  // BGM 볼륨 업데이트 로직 분리
+  // BGM 볼륨 업데이트 로직
   useEffect(function () {
     var bgmElement = document.getElementById('bgm');
     if (!bgmElement) return;
@@ -291,7 +254,6 @@ var App = function () {
 
   // 한글 성경 데이터 로드
   useEffect(function () {
-    console.log('Fetching ko_rev.json...');
     fetch('/assets/ko_rev.json')
       .then(function (response) {
         if (!response.ok) {
@@ -301,7 +263,6 @@ var App = function () {
       })
       .then(function (data) {
         setKoreanData(data);
-        console.log('ko_rev.json loaded:', data);
       })
       .catch(function (err) {
         console.error('Error loading ko_rev.json:', err.message);
@@ -312,23 +273,39 @@ var App = function () {
       });
   }, []);
 
-  // 구절 로드 (shared_verses 경로 사용)
+  // 로그인 시 Firestore에서 구절 동기화
   useEffect(function () {
-    if (!db) return;
-    setDataLoading(true); // 데이터 로드 시작 시 로딩
-    console.log('Subscribing to shared_verses');
+    if (!db || !user) return;
+    setDataLoading(true);
     var versesRef = db.collection('shared_verses').doc('data');
-    // 초기 데이터 로드
     versesRef.get().then(function (doc) {
       if (doc.exists) {
-        var savedVerses = doc.data().verses || [];
+        var data = doc.data();
+        var savedVerses = [];
+        if (data.verse) {
+          savedVerses = [data.verse];
+          versesRef.set({
+            verses: savedVerses,
+            sharedAt: data.sharedAt || new Date().toISOString(),
+            sharedBy: data.sharedBy || user.email
+          }, { merge: true }).then(function () {
+            console.log('Data migrated to new structure (verses array).');
+          }).catch(function (e) {
+            console.error('Failed to migrate data:', e);
+          });
+        } else if (data.verses) {
+          savedVerses = data.verses;
+        }
         setVerses(savedVerses);
-        console.log('Initial verses loaded from shared_verses:', savedVerses);
+        saveVersesToLocalStorage(savedVerses);
       } else {
-        console.log('No verses found in shared_verses, initializing empty array');
-        versesRef.set({ verses: [] }).then(function () {
+        versesRef.set({
+          verses: [],
+          sharedAt: new Date().toISOString(),
+          sharedBy: user.email
+        }).then(function () {
           setVerses([]);
-          console.log('Initialized empty verses array in shared_verses');
+          saveVersesToLocalStorage([]);
         }).catch(function (e) {
           console.error('Failed to initialize verses in shared_verses:', e);
           setError('구절 데이터 초기화 실패: ' + e.message);
@@ -339,39 +316,21 @@ var App = function () {
       }
       setDataLoading(false);
     }).catch(function (e) {
-      console.error('Failed to initially load verses from shared_verses:', e);
+      console.error('Failed to load verses from shared_verses:', e);
       setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
       setDataLoading(false);
       setTimeout(function () {
         setError('');
       }, 3000);
     });
-    // 실시간 구독
-    var unsubscribe = versesRef.onSnapshot(function (doc) {
-      if (doc.exists) {
-        var savedVerses = doc.data().verses || [];
-        setVerses(savedVerses);
-        console.log('Verses loaded from shared_verses:', savedVerses);
-      }
-    }, function (e) {
-      console.error('Failed to load verses from shared_verses:', e);
-      setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
-      setTimeout(function () {
-        setError('');
-      }, 3000);
-    });
-    return function () {
-      unsubscribe();
-    };
-  }, []);
+  }, [user, db]);
 
-  // 사용자 설정 로드 (로그인 시 Firestore에서 설정 가져오기)
+  // 사용자 설정 로드
   useEffect(function () {
     if (!db || !user) return;
     var userId = user.uid;
-    console.log('Loading settings for user:', userId);
     var settingsRef = db.collection('users').doc(userId).collection('settings').doc('data');
-    var unsubscribe = settingsRef.onSnapshot(function (doc) {
+    settingsRef.get().then(function (doc) {
       if (doc.exists) {
         var settings = doc.data();
         setScrollSpeed(settings.scrollSpeed || 0.5);
@@ -380,9 +339,7 @@ var App = function () {
         setContainerWidth(settings.containerWidth || 672);
         setSpeechVolume(settings.speechVolume || 1.0);
         setBgmVolume(settings.bgmVolume || 1.0);
-        console.log('Settings loaded from Firestore:', settings);
       } else {
-        console.log('No settings found for user, initializing with defaults');
         settingsRef.set({
           scrollSpeed: 0.5,
           fontSize: 1,
@@ -400,41 +357,28 @@ var App = function () {
           }, 3000);
         });
       }
-    }, function (e) {
+    }).catch(function (e) {
       console.error('Failed to load settings from Firestore:', e);
       setError('설정을 불러오지 못했습니다: ' + e.message);
       setTimeout(function () {
         setError('');
       }, 3000);
     });
-    return function () {
-      unsubscribe();
-    };
-  }, [user]);
+  }, [user, db]);
 
-  // 구절 저장 (shared_verses 경로 사용)
+  // 구절 변경 시 로컬 캐시에 저장하고, 로그인 상태라면 Firestore와 동기화
   useEffect(function () {
-    if (!db) return;
-    console.log('Saving verses to shared_verses:', verses);
-    var versesRef = db.collection('shared_verses').doc('data');
-    versesRef.set({
-      verses: verses
-    }, { merge: true }).then(function () {
-      console.log('Verses successfully saved to shared_verses:', verses);
-    }).catch(function (e) {
-      console.error('Failed to save verses to shared_verses:', e);
-      setError('구절을 저장하지 못했습니다: ' + e.message);
-      setTimeout(function () {
-        setError('');
-      }, 3000);
-    });
-  }, [verses]);
+    saveVersesToLocalStorage(verses);
+    if (user) {
+      debouncedSyncVersesToFirestore();
+    }
+  }, [verses, user, debouncedSyncVersesToFirestore]);
 
-  // 사용자 설정 저장 (5분 간격 디바운싱)
+  // 사용자 설정 저장
   useEffect(function () {
     if (!db || !user) return;
     debouncedSaveSettings();
-  }, [scrollSpeed, fontSize, lineHeight, containerWidth, speechVolume, bgmVolume, user]);
+  }, [scrollSpeed, fontSize, lineHeight, containerWidth, speechVolume, bgmVolume, user, db, debouncedSaveSettings]);
 
   // 음성 볼륨 변경 시 재생 중인 음성 업데이트
   useEffect(function () {
@@ -448,7 +392,6 @@ var App = function () {
 
   // 자동 스크롤 로직
   useEffect(function () {
-    console.log('Starting auto-scroll with speed:', scrollSpeed);
     var scroll = function () {
       setScrollPos(function (prev) {
         if (!scrollRef.current || verses.length === 0) return prev;
@@ -470,14 +413,12 @@ var App = function () {
   useEffect(function () {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollPos;
-      console.log('Scroll position updated:', scrollPos);
     }
   }, [scrollPos]);
 
   useEffect(function () {
     var newSpeechRate = 0.5 + (scrollSpeed - 0.1) * (1.5 / 1.9);
     setSpeechRate(Math.min(Math.max(newSpeechRate, 0.5), 2));
-    console.log('Speech rate updated:', newSpeechRate);
   }, [scrollSpeed]);
 
   var animationDuration = verses.length > 0 ? 10 + verses.length * 2 : 10;
@@ -502,7 +443,6 @@ var App = function () {
   };
 
   var deleteVerse = function (index) {
-    console.log('Deleting verse at index:', index);
     var updatedVerses = verses.filter(function (_, i) {
       return i !== index;
     });
@@ -600,7 +540,6 @@ var App = function () {
   var searchVerses = async function () {
     setLoading(true);
     setError('');
-    console.log('Starting search with input:', input);
     try {
       var queries = input.split(',').map(function (q) {
         return q.trim();
@@ -680,7 +619,6 @@ var App = function () {
       }
       for (var i = 0; i < queries.length; i++) {
         var query = queries[i];
-        console.log('Processing query:', query);
         var bookMatchResult = query.match(/^(\D+)/);
         var bookMatch = bookMatchResult && bookMatchResult[1] ? bookMatchResult[1].trim() : null;
         var book = bookMap[bookMatch] || bookMatch;
@@ -701,18 +639,14 @@ var App = function () {
           endVerse = Infinity;
         }
         var formattedQuery = book + '+' + chapter;
-        console.log('Formatted query for API:', formattedQuery);
         var kjvText = '영어 구절을 불러오지 못했습니다.';
         try {
-          console.log('Fetching KJV data for:', formattedQuery);
-          var url = 'https://bible-api.com/' + encodeURIComponent(formattedQuery) + '?translation=kjv';
-          console.log('KJV API URL:', url);
+          var url = '/api/bible/' + encodeURIComponent(formattedQuery) + '?translation=kjv';
           var kjvResponse = await fetch(url);
           if (!kjvResponse.ok) {
             throw new Error(`KJV API 요청 실패: ${kjvResponse.status} ${kjvResponse.statusText}`);
           }
           var kjvData = await kjvResponse.json();
-          console.log('KJV API response:', kjvData);
           if (kjvData.error) throw new Error(kjvData.error);
           if (!kjvData.verses || kjvData.verses.length === 0) {
             throw new Error('해당 구절을 찾을 수 없습니다.');
@@ -726,7 +660,6 @@ var App = function () {
             throw new Error('해당 절 범위를 찾을 수 없습니다.');
           }
           kjvText = verses.join(' ');
-          console.log('KJV data fetched:', kjvText);
         } catch (kjvError) {
           console.warn('영어 구절 데이터를 가져오지 못했습니다:', kjvError.message);
           kjvText = '영어 구절을 불러오지 못했습니다: ' + kjvError.message;
@@ -735,15 +668,12 @@ var App = function () {
         try {
           if (!koreanData) throw new Error('한글 성경 데이터가 로드되지 않았습니다.');
           var bookName = bookMapReverse[book] || book;
-          console.log('Looking for book:', bookName);
           var bookData = koreanData.find(function (b) {
             return b.name === bookName;
           });
           if (bookData) {
-            console.log('Book found:', bookData.name);
             var chapterData = bookData.chapters[parseInt(chapter) - 1];
             if (chapterData) {
-              console.log('Chapter found:', chapter);
               var verses = [];
               for (var v = startVerse; v <= (endVerse === Infinity ? chapterData.length : endVerse); v++) {
                 var verseText = chapterData[v - 1];
@@ -753,7 +683,6 @@ var App = function () {
               }
               if (verses.length > 0) {
                 krvText = verses.join(' ');
-                console.log('Korean data fetched:', krvText);
               } else {
                 throw new Error('해당 구절을 찾을 수 없습니다.');
               }
@@ -767,14 +696,17 @@ var App = function () {
           console.warn('한글 구절 데이터를 가져오지 못했습니다:', krvError.message);
           krvText = '한글 구절을 불러오지 못했습니다: ' + krvError.message;
         }
-        results.push({
-          query: query,
-          kjvText: kjvText,
-          krvText: krvText
-        });
+        if (krvText !== '한글 구절을 불러오지 못했습니다.') {
+          results.push({
+            query: query,
+            kjvText: kjvText,
+            krvText: krvText
+          });
+        } else {
+          throw new Error('구절을 불러오지 못했습니다: 영어와 한글 데이터 모두 실패');
+        }
       }
       setSearchResults(results);
-      console.log('Search results:', results);
     } catch (error) {
       console.error('Error fetching verses:', error.message);
       setError('구절을 불러오지 못했습니다: ' + error.message);
@@ -787,7 +719,6 @@ var App = function () {
   };
 
   var addVerses = function (verse, index) {
-    console.log('Adding verse to scroll list:', verse);
     setVerses(verses.concat([verse]));
     var updatedResults = searchResults.filter(function (_, i) {
       return i !== index;
@@ -911,7 +842,7 @@ var App = function () {
   if (dataLoading) {
     return /*#__PURE__*/React.createElement("div", {
       className: "loading"
-    }, "데이터 로드 중...");
+    }, "Firestore에서 데이터 동기화 중...");
   }
 
   return /*#__PURE__*/React.createElement("div", {
@@ -1212,4 +1143,3 @@ var App = function () {
 };
 
 ReactDOM.render(/*#__PURE__*/React.createElement(App, null), document.getElementById('root'));
-console.log('App rendered successfully.');
