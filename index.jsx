@@ -312,36 +312,50 @@ var App = function () {
       });
   }, []);
 
-  // 로그인 상태에 따라 구절 로드 (실시간 업데이트)
+  // 구절 로드 (shared_verses 경로 사용)
   useEffect(function () {
-    if (!db || !user) return;
+    if (!db) return;
     setDataLoading(true); // 데이터 로드 시작 시 로딩
-    var userId = user.uid;
-    console.log('Subscribing to verses for user:', userId);
-    var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
-    var unsubscribe = versesRef.onSnapshot(function (doc) {
+    console.log('Subscribing to shared_verses');
+    var versesRef = db.collection('shared_verses').doc('data');
+    // 초기 데이터 로드
+    versesRef.get().then(function (doc) {
       if (doc.exists) {
         var savedVerses = doc.data().verses || [];
         setVerses(savedVerses);
-        console.log('Verses loaded from Firestore:', savedVerses);
+        console.log('Initial verses loaded from shared_verses:', savedVerses);
       } else {
-        console.log('No verses found for user, initializing empty array in Firestore');
+        console.log('No verses found in shared_verses, initializing empty array');
         versesRef.set({ verses: [] }).then(function () {
           setVerses([]);
-          console.log('Initialized empty verses array in Firestore');
+          console.log('Initialized empty verses array in shared_verses');
         }).catch(function (e) {
-          console.error('Failed to initialize verses in Firestore:', e);
+          console.error('Failed to initialize verses in shared_verses:', e);
           setError('구절 데이터 초기화 실패: ' + e.message);
           setTimeout(function () {
             setError('');
           }, 3000);
         });
       }
-      setDataLoading(false); // 데이터 로드 완료
-    }, function (e) {
-      console.error('Failed to load verses from Firestore:', e);
+      setDataLoading(false);
+    }).catch(function (e) {
+      console.error('Failed to initially load verses from shared_verses:', e);
       setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
       setDataLoading(false);
+      setTimeout(function () {
+        setError('');
+      }, 3000);
+    });
+    // 실시간 구독
+    var unsubscribe = versesRef.onSnapshot(function (doc) {
+      if (doc.exists) {
+        var savedVerses = doc.data().verses || [];
+        setVerses(savedVerses);
+        console.log('Verses loaded from shared_verses:', savedVerses);
+      }
+    }, function (e) {
+      console.error('Failed to load verses from shared_verses:', e);
+      setError('저장된 구절을 불러오지 못했습니다: ' + e.message);
       setTimeout(function () {
         setError('');
       }, 3000);
@@ -349,7 +363,7 @@ var App = function () {
     return function () {
       unsubscribe();
     };
-  }, [user]);
+  }, []);
 
   // 사용자 설정 로드 (로그인 시 Firestore에서 설정 가져오기)
   useEffect(function () {
@@ -398,24 +412,23 @@ var App = function () {
     };
   }, [user]);
 
-  // 구절 저장 (즉시 저장)
+  // 구절 저장 (shared_verses 경로 사용)
   useEffect(function () {
-    if (!db || !user) return;
-    var userId = user.uid;
-    console.log('Saving verses for user:', userId, verses);
-    var versesRef = db.collection('users').doc(userId).collection('verses').doc('data');
+    if (!db) return;
+    console.log('Saving verses to shared_verses:', verses);
+    var versesRef = db.collection('shared_verses').doc('data');
     versesRef.set({
       verses: verses
     }, { merge: true }).then(function () {
-      console.log('Verses successfully saved to Firestore:', verses);
+      console.log('Verses successfully saved to shared_verses:', verses);
     }).catch(function (e) {
-      console.error('Failed to save verses to Firestore:', e);
+      console.error('Failed to save verses to shared_verses:', e);
       setError('구절을 저장하지 못했습니다: ' + e.message);
       setTimeout(function () {
         setError('');
       }, 3000);
     });
-  }, [verses, user]);
+  }, [verses]);
 
   // 사용자 설정 저장 (5분 간격 디바운싱)
   useEffect(function () {
