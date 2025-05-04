@@ -21,7 +21,7 @@ function initializeFirebase() {
     return false;
   }
   const firebaseConfig = {
-    apiKey: process.env.FIREBASE_API_KEY || "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o",
+    apiKey: "AIzaSyCZToyuFYN9i-Y25KIVbUJ1vYIGje44f6o",
     authDomain: "j2wbibleinfinitescroll.firebaseapp.com",
     projectId: "j2wbibleinfinitescroll",
     storageBucket: "j2wbibleinfinitescroll.firebasestorage.app",
